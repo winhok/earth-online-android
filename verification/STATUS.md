@@ -1,24 +1,38 @@
-# 本次交付的实测状态
+# 验证与交付状态
 
-核对日期：2026-09-08。源码版本：1.0.0-rc.1。
+更新日期：2026-09-08。源码版本：`1.0.0-rc.1`。本次更新记录实际源码推送，不把候选源码提升为已验收的正式产品。
 
-## 已执行
+## GitHub 推送：已完成
 
-纯 Kotlin 领域代码由本次环境的 Kotlin CLI 1.9.0 与 OpenJDK 21 编译执行，结果为 41/41 场景通过。一个性质场景遍历 0–12,000，共 12,001 个 XP 输入。它们运行的是项目实际 `:core` 源码，不是 Python 翻译的替代实现。报告见 `core-tests.txt`。
+目标仓库：`winhok/earth-online-android`；分支：`main`。
 
-Kotlin PSI 对所有 Kotlin / Kotlin DSL 文件进行了语法解析，结果见 `kotlin-syntax.txt`。这只证明解析层无语法错误，不检查 Android/Compose/Room 的符号解析、KSP 生成或 Gradle 执行。
+完整源码导入提交：`ca2da8281fee4ea57ab33449d3369bcaeeee204d`。
 
-XML、TOML、YAML 与 shell 的静态检查见 `static-checks.txt`。静态检查不能替代 CI、PowerShell 执行、设备权限或像素级界面验收。
+父提交：`e003415099288ce0c8bae7880b3b493305b55252`（原仓库初始化提交）。
 
-## 尚未执行或完成
+完整导入的 Git tree：`e469222eaf7731b25bae04a8e8656a3f58f2f381`。它与原始 ZIP 解压后的全部 72 个文件及可执行权限对应的 Git tree 完全一致。本次通过 GitHub Git Data 接口创建 tree/commit，并以非强制方式更新 main；已读取远端 main ref 确认生效。
 
-本环境无 Android SDK、Gradle 与依赖缓存，且不能连接构建下载地址。没有运行项目选定的 Kotlin 2.3.10 / JDK 17 / AGP 8.13.2 全量构建，没有 Android Lint 结果，没有运行 KSP/Room 编译器，没有 APK 或 AAB，也没有 UI 截图。
+原始 72 文件快照保留在上述导入提交；后续文档更新不改变应用实现。原始交付包里“未创建仓库/未推送”的陈述是历史状态，不再是当前事实。仓库由用户提前创建，本次没有创建新仓库或更改仓库可见性。
 
-9 项数据库/存档与 2 项 Compose UI 仪器测试已写入，但未执行。Room schema 尚未生成。签名构建与应用商店发布均未进行。
+Android CI 首次运行编号：`34153823405`，对应上述源码提交。核对时为 `in_progress`，尚无完成结论；实时状态以 GitHub Actions 为准：
 
-已成功读取已连接 GitHub 用户 `winhok`。当前连接器缺少创建仓库动作；没有用其他仓库冒充目标，没有创建远程仓库，没有推送，没有 GitHub Actions run。提供的 publish 脚本需要用户在本机授权执行才产生这些结果。
+https://github.com/winhok/earth-online-android/actions/runs/34153823405
 
-## 如何复核
+## 原源码包已有的验证记录
+
+原交付报告记录：使用 Kotlin CLI 1.9.0 与 OpenJDK 21 执行 41 组纯 Kotlin 领域场景，通过结果见 `core-tests.txt`。性质测试覆盖 12,001 个 XP 输入；实际循环为 0 至 120,000、步长 10。这不是 Android 全量构建。
+
+`kotlin-syntax.txt` 记录 28 个 Kotlin/Kotlin DSL 文件语法解析通过；`static-checks.txt` 记录 XML、TOML、YAML 与 Shell 静态检查。这些报告来自原交付验证，本次推送没有重新执行它们；保留记录不代表新的平台测试通过。
+
+`delivery.json` 是首次打包时的历史摘要，不是实时仓库状态接口；其中当时的仓库创建状态已被上面的实际推送记录取代。
+
+## 仍未完成的产品验收
+
+尚无通过的完整 Android 构建结果、Lint/Room/KSP 集成结果或已验收的 APK/AAB。9 项数据库/存档与 2 项 Compose UI 仪器测试在源码中存在，不能据此认定已经运行通过。Room schema 仍需真实构建生成；没有真机 UI、备份恢复、通知或无障碍验收结果。
+
+没有配置生产签名或进行应用商店发布。大存档 8 MiB 限制与全量快照性能、中文文案资源化、设备兼容性及发布主体等仍是发布门槛。
+
+## 复核命令
 
 ```bash
 bash scripts/test-core-offline.sh
@@ -26,8 +40,4 @@ bash scripts/test-core-offline.sh
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-第一个命令需要本地 Kotlin CLI，可在无 Android SDK 时运行。后两个命令需要实际 Android 工具链、依赖和模拟器/测试机。报告只反映执行当时源码，应在任何代码或依赖变更后重新运行，不能长期复用本次报告证明新版本正确。
-
-## 已知发布阻塞
-
-Android 构建/测试未验证；无真实 Room schema；大存档 8 MiB 限制与全量快照容量未压测；中文文案尚未全面资源化；没有真机提醒/SAF/无障碍验收；未配置生产签名、对外隐私主体与支持渠道。详见 `docs/RELEASE_CHECKLIST.md`。
+第一个命令需要 Kotlin CLI；后两个需要真实 Android 工具链、依赖和模拟器/测试机。报告必须与实际提交版本对应，不能用旧报告证明后续改动正确。发布清单见 `docs/RELEASE_CHECKLIST.md`；其中历史建仓步骤已经完成，其余条目仍须用实际证据关闭。
