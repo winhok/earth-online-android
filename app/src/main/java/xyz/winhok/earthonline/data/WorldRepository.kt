@@ -30,6 +30,8 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
     private suspend fun event(kind: EventKind, text: String, questId: String? = null, xp: Int = 0) {
         ensure(dao.eventCount() < QuestRules.MAX_EVENTS, RuleError.LIMIT)
         dao.putEvent(EventEntity(JournalEvent(id(), kind, text, clock.millis(), questId, xp)))
+        // Roll back the entire action rather than create a save that can no longer be exported.
+        SnapshotBudget.requireFits(readSnapshot())
     }
 
     suspend fun join(name: String, server: String) = db.withTransaction {
@@ -46,6 +48,7 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
             remindersEnabled = reminders, reminderHour = hour)
         QuestRules.validatePlayer(value)
         dao.putPlayer(PlayerEntity(value = value))
+        SnapshotBudget.requireFits(readSnapshot())
     }
 
     suspend fun saveQuest(draft: QuestDraft): Quest = db.withTransaction {
@@ -137,6 +140,7 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
 
     suspend fun restore(world: World) {
         BackupValidator.validate(world) // No mutation until parsing, digest and all relations validate.
+        SnapshotBudget.requireFits(world)
         db.withTransaction {
             clearTables()
             dao.putPlayer(PlayerEntity(value = world.player.copy(remindersEnabled = false, lastReminderDay = null)))
@@ -145,7 +149,10 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
             world.completions.forEach { dao.putCompletion(CompletionEntity(it)) }
             world.events.forEach { dao.putEvent(EventEntity(it)) }
             // Full backups at the event limit remain importable without an extra event.
-            if (world.events.size < QuestRules.MAX_EVENTS) event(EventKind.RESTORED, "JSON")
+            if (world.events.size < QuestRules.MAX_EVENTS &&
+                SnapshotBudget.upperBound(world) + 4_096 <= SnapshotBudget.MAX_BYTES) {
+                event(EventKind.RESTORED, "JSON")
+            }
         }
     }
 

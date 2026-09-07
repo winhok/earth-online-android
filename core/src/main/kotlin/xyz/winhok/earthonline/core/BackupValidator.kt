@@ -7,6 +7,7 @@ object BackupValidator {
     private fun validId(id: String) = id.length in 1..80 && id.all { it.isLetterOrDigit() || it in "-_:" }
     private fun unique(ids: List<String>) = ids.size == ids.toSet().size
     fun validate(world: World) {
+        SnapshotBudget.requireFits(world)
         QuestRules.validatePlayer(world.player)
         requireRule(world.player.onboarded, RuleError.INVALID_BACKUP)
         requireRule(world.quests.size <= QuestRules.MAX_QUESTS && world.goals.size <= QuestRules.MAX_GOALS &&

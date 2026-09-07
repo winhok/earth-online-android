@@ -36,7 +36,7 @@ fun RuleError.message() = when (this) {
     RuleError.NOT_AVAILABLE -> "任务尚未开始、正在暂缓或已经完成。"
     RuleError.REPEAT_LOCKED -> "已有完成记录，不能更改任务类型。请归档后创建新任务。"
     RuleError.MISSING_GOAL -> "主线不存在或已归档，请重新选择。"
-    RuleError.LIMIT -> "当前存档达到容量上限，请先导出存档。"
+    RuleError.LIMIT -> "存档已达安全容量上限，本次修改未保存。请导出备份后开启新存档。"
     RuleError.INVALID_BACKUP -> "存档校验失败，原有数据没有被修改。"
 }
 fun dateLabel(day: Long): String = LocalDate.ofEpochDay(day).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
