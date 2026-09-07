@@ -19,7 +19,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = providers.environmentVariable("VERSION_CODE").orNull?.toInt() ?: 1
-        versionName = providers.environmentVariable("VERSION_NAME").orNull ?: "1.0.0-rc.1"
+        versionName = providers.environmentVariable("VERSION_NAME").orNull ?: "1.0.0"
         require(versionCode!! > 0) { "VERSION_CODE must be positive" }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

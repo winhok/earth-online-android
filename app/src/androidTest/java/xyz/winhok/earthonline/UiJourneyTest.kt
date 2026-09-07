@@ -1,5 +1,6 @@
 package xyz.winhok.earthonline
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -28,7 +29,9 @@ class UiJourneyTest {
         // The IME changes LazyColumn composition; scroll the form before locating its button.
         compose.onNodeWithTag("join-form").performScrollToNode(hasTestTag("join-submit"))
         await(hasTestTag("join-submit") and isEnabled())
-        compose.onNodeWithTag("join-submit").performClick()
+        // Verify visibility, then invoke the UI accessibility action without an IME-animation tap race.
+        // The signed-release black-box suite independently exercises physical ADB taps.
+        compose.onNodeWithTag("join-submit").assertIsDisplayed().performSemanticsAction(SemanticsActions.OnClick) { it() }
         await(hasTestTag("create-quest"))
     }
     private fun openEditor(title: String) {

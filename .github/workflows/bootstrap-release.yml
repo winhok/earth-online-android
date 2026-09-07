@@ -1,0 +1,152 @@
+name: Verify and publish 1.0.0
+on:
+  push:
+    branches: ['release/v1.0.0']
+permissions:
+  contents: read
+concurrency:
+  group: earth-first-release
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION_NAME: '1.0.0'
+      VERSION_CODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse accidental signing identity replacement
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=1" --jq 'length')" = '0'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Create signing identity and encrypt owner recovery package
+        run: bash scripts/bootstrap-signing.sh
+      - name: Preserve encrypted signing backup before building
+        uses: actions/upload-artifact@v4
+        with:
+          name: signing-recovery-encrypted
+          path: |
+            release-output/signing-backup.cms
+            release-output/app-signing-certificate.crt
+            release-output/certificate-sha256.txt
+          retention-days: 90
+          if-no-files-found: error
+      - name: Build and verify final packages
+        run: |
+          sh scripts/bootstrap-wrapper.sh
+          gradle :core:test :app:lintDebug :app:lintRelease :app:assembleRelease :app:bundleRelease --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk release-output/earth-online-1.0.0.apk
+          cp app/build/outputs/bundle/release/app-release.aab release-output/earth-online-1.0.0.aab
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs release-output/earth-online-1.0.0.apk > release-output/apk-signature-verification.txt
+          jarsigner -verify release-output/earth-online-1.0.0.aab > release-output/bundle-signature-verification.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging release-output/earth-online-1.0.0.apk > release-output/apk-manifest-summary.txt
+          if grep -q "uses-permission: name='android.permission.INTERNET'" release-output/apk-manifest-summary.txt; then exit 1; fi
+          printf '%s\n' "$GITHUB_SHA" > release-output/source-commit.txt
+          (cd release-output && sha256sum earth-online-1.0.0.apk earth-online-1.0.0.aab > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-1.0.0
+          path: release-output/
+          if-no-files-found: error
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-build-evidence
+          path: |
+            core/build/test-results/
+            app/build/reports/
+            app/schemas/
+          retention-days: 90
+      - name: Remove plaintext signing material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/earth-signing"
+  acceptance:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [26, 29, 35, 36]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-1.0.0
+          path: release-output
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: bash scripts/emulator-acceptance.sh && python3 scripts/release-smoke.py release-output/earth-online-1.0.0.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-device-api-${{ matrix.api }}
+          path: |
+            verification/device/
+            verification/release-device/
+            app/build/outputs/androidTest-results/
+            app/build/reports/androidTests/
+          retention-days: 90
+          if-no-files-found: error
+  publish:
+    needs: [package, acceptance]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-1.0.0
+          path: release-output
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-device-api-*
+          path: device-evidence
+      - name: Publish only the fully tested signed binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -czf release-output/device-acceptance-evidence.tar.gz -C device-evidence .
+          gh release create v1.0.0 --target "$GITHUB_SHA" --title '地球 Online 1.0.0 · Android 离线单人版' --notes-file docs/RELEASE_1.0.0.md \
+            release-output/earth-online-1.0.0.apk release-output/earth-online-1.0.0.aab \
+            release-output/SHA256SUMS.txt release-output/app-signing-certificate.crt \
+            release-output/certificate-sha256.txt release-output/source-commit.txt \
+            release-output/apk-signature-verification.txt release-output/apk-manifest-summary.txt \
+            release-output/device-acceptance-evidence.tar.gz
