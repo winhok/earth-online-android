@@ -1,0 +1,1 @@
+Parsed 28 Kotlin/Kotlin-DSL files; 0 syntax errors. This is NOT Android type checking.

@@ -1,0 +1,17 @@
+name: Bug report
+description: Report a reproducible problem without attaching private task data
+title: '[Bug] '
+body:
+  - type: input
+    id: environment
+    attributes:
+      label: Android / device / app version
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps, expected and actual result
+      description: Do not include private task contents, exported backups, tokens, or keys.
+    validations:
+      required: true

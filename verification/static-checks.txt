@@ -1,0 +1,10 @@
+PASS XML parsing (8 files)
+PASS TOML parsing and version-reference integrity
+PASS YAML parsing and workflow shape (4 files; not runtime GitHub validation)
+PASS Shell syntax (4 scripts; PowerShell/batch not executable in this environment)
+PASS App source manifest requests only POST_NOTIFICATIONS (merged manifest still needs Android build)
+PASS Local Markdown link targets (8 links)
+PASS No TODO()/NotImplementedError implementation placeholders (20 production Kotlin files)
+PASS No signing key artifacts in source tree
+
+These are static checks only. Android builds, UI, Room/KSP generation, PowerShell, and GitHub remote actions remain unverified.

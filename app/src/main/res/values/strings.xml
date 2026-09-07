@@ -1,0 +1,6 @@
+<resources>
+  <string name="app_name">地球 Online</string>
+  <string name="notification_channel">每日冒险提醒</string>
+  <string name="notification_title">冒险仍在继续</string>
+  <string name="notification_body">还有 %1$d 项可执行任务。选一件小事，继续前进。</string>
+</resources>

@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0-rc.1",
+  "product": "Earth Online Android",
+  "source_files": 72,
+  "production_kotlin_files": 20,
+  "production_kotlin_lines": 1934,
+  "test_kotlin_files": 4,
+  "test_kotlin_lines": 379,
+  "domain_scenarios_passed": 41,
+  "xp_property_inputs": 12001,
+  "instrumented_tests_written_not_run": 11,
+  "android_build_performed": false,
+  "apk_generated": false,
+  "github_repository_created": false
+}

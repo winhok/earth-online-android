@@ -1,0 +1,42 @@
+PASS level boundaries
+PASS level arithmetic property over 12001 inputs
+PASS negative and extreme XP cannot overflow
+PASS difficulty reward does not depend on inflated duration
+PASS blank title rejected
+PASS oversized title rejected
+PASS duration range rejected
+PASS priority range rejected
+PASS invalid dates rejected
+PASS timezone is validated
+PASS once occurrence is stable across dates
+PASS daily occurrence changes at calendar boundary
+PASS double completion is idempotent
+PASS undo redo preserves reward and skill snapshots
+PASS daily future start is unavailable
+PASS paused and archived tasks cannot earn XP
+PASS snooze expires on the specified date
+PASS single tasks may finish before deadline
+PASS edit keeps identity state and creation time
+PASS history locks repeat type
+PASS before first completion repeat type is editable
+PASS revoked records contribute zero XP
+PASS skill totals are ledger based
+PASS current streak deduplicates dates and tolerates unfinished today
+PASS historical streak achievement survives a rest day
+PASS recommendation excludes insufficient time and energy
+PASS recommendation excludes completed and inactive quests
+PASS overdue reason and priority are explainable
+PASS mainline bonus is removed for archived goals
+PASS recommendations have deterministic tie breaks
+PASS fixed save timezone handles midnight exactly
+PASS travelling does not change save timezone
+PASS valid snapshot passes backup validation
+PASS duplicate backup identity is rejected
+PASS orphan mainline is rejected
+PASS orphan reward row is rejected
+PASS reward outside known schedule is rejected
+PASS daily occurrence date mismatch is rejected
+PASS changed task kind with old ledger is rejected
+PASS archiving retains historical XP
+PASS undo after midnight targets the old occurrence ID
+41 scenarios passed

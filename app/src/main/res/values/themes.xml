@@ -1,0 +1,9 @@
+<resources>
+  <style name="Theme.EarthOnline" parent="android:style/Theme.Material.Light.NoActionBar">
+    <item name="android:fontFamily">sans</item>
+    <item name="android:windowLightStatusBar">false</item>
+    <item name="android:colorAccent">#81D9B3</item>
+    <item name="android:windowBackground">#101713</item>
+    <item name="android:navigationBarColor">#101713</item>
+  </style>
+</resources>

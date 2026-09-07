@@ -1,0 +1,27 @@
+.gradle/
+.kotlin/
+.idea/
+**/build/
+local.properties
+*.iml
+*.jks
+*.keystore
+keystore.properties
+.env
+.env.*
+!*.example
+*.apk
+*.aab
+*.hprof
+.DS_Store
+captures/
+verification/local/
+
+# Private exports and signing material
+backups/
+earth-online-????-??-??.json
+*.backup.json
+*.pem
+*.p12
+*.pfx
+*.key
