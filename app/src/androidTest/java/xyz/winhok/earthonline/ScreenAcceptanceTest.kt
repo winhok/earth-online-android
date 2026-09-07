@@ -25,7 +25,7 @@ class ScreenAcceptanceTest {
             repo.complete(done.id)
             repo.addNote("今天开始自己的冒险。")
         }
-        compose.waitUntil(15_000) { compose.onAllNodesWithText("指挥台").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("冒险测试员，欢迎上线").fetchSemanticsNodes().isNotEmpty() }
     }
     private fun screenshot(name: String) {
         compose.waitForIdle()
@@ -37,12 +37,13 @@ class ScreenAcceptanceTest {
     @Test fun allMainScreensAndSettingsRender() {
         screenshot("01-dashboard")
         compose.onNodeWithText("任务").performClick()
-        compose.onNodeWithText("完成今天的一个小目标").assertExists()
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("完成今天的一个小目标").fetchSemanticsNodes().isNotEmpty() }
         screenshot("02-quests")
         compose.onNodeWithText("角色").performClick()
         screenshot("03-character")
         compose.onNodeWithText("日志").performClick()
         screenshot("04-journal")
+        compose.waitUntil(15_000) { compose.onAllNodes(hasContentDescription("设置与存档") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("设置与存档").performClick()
         compose.onNodeWithText("玩家设置").assertExists()
         screenshot("05-settings")
@@ -50,14 +51,14 @@ class ScreenAcceptanceTest {
     @Test fun activityRecreationRetainsCompletedLedger() {
         val before = runBlocking { repo.snapshot() }
         compose.activityRule.scenario.recreate()
-        compose.waitUntil(15_000) { compose.onAllNodesWithText("指挥台").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("冒险测试员，欢迎上线").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(before, runBlocking { repo.snapshot() })
         assertEquals(10L, runBlocking { ProgressRules.total(repo.snapshot().completions).xp })
     }
     @Test fun lightThemeIsPersistedAndRendered() {
         runBlocking { repo.updatePlayer("冒险测试员", "地球·测试服", ThemeMode.LIGHT, false, 20) }
         compose.activityRule.scenario.recreate()
-        compose.waitUntil(15_000) { compose.onAllNodesWithText("指挥台").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("冒险测试员，欢迎上线").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(ThemeMode.LIGHT, runBlocking { repo.snapshot().player.theme })
         screenshot("06-light-theme")
     }

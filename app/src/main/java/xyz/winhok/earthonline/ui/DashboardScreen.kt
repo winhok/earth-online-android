@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import xyz.winhok.earthonline.core.*
@@ -18,7 +19,7 @@ import xyz.winhok.earthonline.core.*
 fun JoinScreen(busy: Boolean, join: (String, String) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var server by rememberSaveable { mutableStateOf("现实服") }
-    LazyColumn(Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(24.dp),
+    LazyColumn(Modifier.fillMaxSize().imePadding().testTag("join-form"), contentPadding = PaddingValues(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { Spacer(Modifier.height(16.dp)); PlanetMark() }
         item {
@@ -27,11 +28,11 @@ fun JoinScreen(busy: Boolean, join: (String, String) -> Unit) {
                 modifier = Modifier.padding(top = 12.dp))
         }
         item { OutlinedTextField(name, { name = it.take(32) }, label = { Text("玩家名") },
-            singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !busy) }
+            singleLine = true, modifier = Modifier.fillMaxWidth().testTag("player-name"), enabled = !busy) }
         item { OutlinedTextField(server, { server = it.take(40) }, label = { Text("服务器名（自己取一个）") },
             singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !busy) }
         item { Button(onClick = { join(name, server) }, enabled = !busy && name.isNotBlank() && server.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("创建本地角色") } }
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("join-submit")) { Text("创建本地角色") } }
         item { Text("无需账号 · 无广告 · 无云端上传\n任务保存在本机。卸载前请导出存档；备份文件为明文。\n这里不因拖延扣血，也不评价你的现实价值。",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }

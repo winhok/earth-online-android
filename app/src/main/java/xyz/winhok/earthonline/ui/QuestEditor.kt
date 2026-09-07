@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import xyz.winhok.earthonline.core.*
@@ -43,7 +44,7 @@ fun QuestEditor(quest: Quest?, goals: List<Goal>, hasHistory: Boolean, busy: Boo
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             item { OutlinedTextField(title, { title = it.take(120) }, label = { Text("任务标题") },
                 supportingText = { Text("${title.length}/120 · 用一个可执行的动词开头") },
-                modifier = Modifier.fillMaxWidth(), maxLines = 3, enabled = !busy) }
+                modifier = Modifier.fillMaxWidth().testTag("quest-title"), maxLines = 3, enabled = !busy) }
             item {
                 Text("任务类型", style = MaterialTheme.typography.titleSmall)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -10,6 +10,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import xyz.winhok.earthonline.core.*
 
@@ -65,7 +66,7 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
                 }
             },
             floatingActionButton = {
-                if (ready && (tab == 0 || tab == 1)) ExtendedFloatingActionButton(onClick = create,
+                if (ready && (tab == 0 || tab == 1)) ExtendedFloatingActionButton(onClick = create, modifier = Modifier.testTag("create-quest"),
                     icon = { Icon(Icons.Default.Add, null) }, text = { Text("接取任务") })
                 if (ready && tab == 3) FloatingActionButton(onClick = { noteOpen = true }) { Icon(Icons.Default.EditNote, "写冒险手记") }
             },

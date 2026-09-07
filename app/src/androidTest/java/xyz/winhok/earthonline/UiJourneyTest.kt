@@ -13,40 +13,56 @@ import xyz.winhok.earthonline.core.ProgressRules
 class UiJourneyTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private val repo get() = (compose.activity.application as EarthApplication).repository
+    private fun await(matcher: SemanticsMatcher) {
+        compose.waitUntil(15_000) { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+    }
     @Before fun reset() {
         runBlocking { repo.reset() }
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("创建本地角色").fetchSemanticsNodes().isNotEmpty() }
+        // Await the repository emission, not a stale button from the previous activity.
+        await(hasTestTag("join-form"))
+        compose.onNodeWithTag("join-form").performScrollToNode(hasTestTag("player-name"))
+        await(hasTestTag("player-name") and isEnabled())
     }
     private fun join() {
-        compose.onNode(hasSetTextAction() and hasText("玩家名")).performTextInput("冒险测试员")
-        compose.onNodeWithText("创建本地角色").performClick()
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("指挥台").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("player-name").performTextReplacement("冒险测试员")
+        // The IME changes LazyColumn composition; scroll the form before locating its button.
+        compose.onNodeWithTag("join-form").performScrollToNode(hasTestTag("join-submit"))
+        await(hasTestTag("join-submit") and isEnabled())
+        compose.onNodeWithTag("join-submit").performClick()
+        await(hasTestTag("create-quest"))
+    }
+    private fun openEditor(title: String) {
+        // The dashboard also has an off-screen empty-state button with the same text.
+        compose.onNodeWithTag("create-quest").performClick()
+        await(hasTestTag("quest-title") and isEnabled())
+        compose.onNodeWithTag("quest-title").performTextInput(title)
+        compose.onNodeWithText("保存").assertIsEnabled()
     }
     @Test fun createCompleteAndUndoQuest() {
         join()
-        compose.onAllNodesWithText("接取任务").onFirst().performClick()
-        compose.onNode(hasSetTextAction() and hasText("任务标题")).performTextInput("完成端到端测试")
+        openEditor("完成端到端测试")
         compose.onNodeWithText("保存").performClick()
-        compose.waitUntil(10_000) {
-            compose.onAllNodesWithText("保存").fetchSemanticsNodes().isEmpty() &&
+        compose.waitUntil(15_000) {
+            compose.onAllNodesWithTag("quest-title").fetchSemanticsNodes().isEmpty() &&
                 runBlocking { repo.snapshot().quests.any { it.title == "完成端到端测试" } }
         }
         compose.onNodeWithText("任务").performClick()
+        await(hasContentDescription("完成任务：完成端到端测试") and isEnabled())
         compose.onNodeWithContentDescription("完成任务：完成端到端测试").performClick()
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("撤销").fetchSemanticsNodes().isNotEmpty() }
+        await(hasText("撤销") and hasClickAction())
         assertEquals(25L, runBlocking { ProgressRules.total(repo.snapshot().completions).xp })
         compose.onNodeWithText("撤销").performClick()
-        compose.waitUntil(10_000) { runBlocking { ProgressRules.total(repo.snapshot().completions).xp == 0L } }
+        compose.waitUntil(15_000) { runBlocking { ProgressRules.total(repo.snapshot().completions).xp == 0L } }
         compose.onNodeWithText("完成端到端测试").assertExists()
     }
     @Test fun editorDraftSurvivesActivityRecreation() {
         join()
-        compose.onAllNodesWithText("接取任务").onFirst().performClick()
-        compose.onNode(hasSetTextAction() and hasText("任务标题")).performTextInput("旋转后保留草稿")
+        openEditor("旋转后保留草稿")
         compose.activityRule.scenario.recreate()
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("旋转后保留草稿").fetchSemanticsNodes().isNotEmpty() }
+        await(hasTestTag("quest-title") and hasText("旋转后保留草稿"))
+        compose.onNodeWithTag("quest-title").assertTextContains("旋转后保留草稿")
         compose.onNodeWithText("保存").performClick()
-        compose.waitUntil(10_000) { runBlocking { repo.snapshot().quests.any { it.title == "旋转后保留草稿" } } }
+        compose.waitUntil(15_000) { runBlocking { repo.snapshot().quests.any { it.title == "旋转后保留草稿" } } }
         assertEquals(1, runBlocking { repo.snapshot().quests.size })
     }
 }
