@@ -60,11 +60,30 @@ def tap(n: ET.Element) -> None:
     adb('shell', 'input', 'tap', str((coords[0] + coords[2]) // 2), str((coords[1] + coords[3]) // 2))
 
 
+def ime_visible(windows: str) -> bool:
+    # InputMethodManager dumps include historical visibility events. Only the
+    # current input-method WindowState tells us whether BACK would hide a keyboard.
+    for block in re.split(r'\n\s*Window #\d+ ', windows)[1:]:
+        if 'InputMethod' not in block.splitlines()[0]:
+            continue
+        if re.search(r'\bmViewVisibility=0x0\b', block) and (
+            'isOnScreen=true' in block or 'isVisible=true' in block or 'mHasSurface=true' in block
+        ):
+            return True
+    return False
+
+
 def hide_keyboard() -> None:
-    state = adb('shell', 'dumpsys', 'input_method')
-    if re.search(r'(mInputShown|mIsInputViewShown|isInputViewShown)=true', state):
+    windows = adb('shell', 'dumpsys', 'window', 'windows')
+    (OUT / 'last-keyboard-windows.txt').write_text(windows)
+    if ime_visible(windows):
         adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
-        time.sleep(.3)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if not ime_visible(adb('shell', 'dumpsys', 'window', 'windows')):
+                return
+            time.sleep(.2)
+        raise AssertionError('Keyboard did not hide; refusing to send a second BACK to the app')
 
 
 def click(value: str, scroll: bool = False) -> None:
