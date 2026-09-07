@@ -12,12 +12,18 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.work.*
+import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkerParameters
 import java.time.Instant
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
-import xyz.winhok.earthonline.*
+import xyz.winhok.earthonline.EarthApplication
+import xyz.winhok.earthonline.MainActivity
+import xyz.winhok.earthonline.R
 import xyz.winhok.earthonline.core.QuestRules
 
 object Reminders {

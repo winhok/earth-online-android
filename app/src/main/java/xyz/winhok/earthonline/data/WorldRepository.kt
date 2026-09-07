@@ -52,8 +52,10 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
         player()
         val old = draft.id?.let { quest(it) }
         if (old == null) ensure(dao.questCount() < QuestRules.MAX_QUESTS, RuleError.LIMIT)
-        if (draft.goalId != null) {
-            val goal = dao.goal(draft.goalId)?.value
+        // Snapshot the public nullable property from :core before checking it.
+        val goalId = draft.goalId
+        if (goalId != null) {
+            val goal = dao.goal(goalId)?.value
             ensure(goal != null && (!goal.archived || old?.goalId == goal.id), RuleError.MISSING_GOAL)
         }
         val value = QuestRules.edit(old, draft, id(), maxOf(clock.millis(), old?.createdAt ?: 0),

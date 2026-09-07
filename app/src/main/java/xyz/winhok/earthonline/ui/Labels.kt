@@ -44,8 +44,8 @@ fun timeLabel(millis: Long, zone: String): String = Instant.ofEpochMilli(millis)
     .format(DateTimeFormatter.ofPattern("MM-dd HH:mm"))
 fun Quest.meta(day: Long): String = buildList {
     add(kind.label()); add("${estimatedMinutes} 分钟"); add(skill.label())
-    if (dueDay != null) add(if (kind == QuestKind.DAILY) "${dateLabel(dueDay)} 起" else "${dateLabel(dueDay)} 截止")
-    if (snoozedUntilDay != null && snoozedUntilDay > day) add("暂缓至 ${dateLabel(snoozedUntilDay)}")
+    dueDay?.let { due -> add(if (kind == QuestKind.DAILY) "${dateLabel(due)} 起" else "${dateLabel(due)} 截止") }
+    snoozedUntilDay?.let { until -> if (until > day) add("暂缓至 ${dateLabel(until)}") }
 }.joinToString(" · ")
 fun achievementLabel(id: String) = when (id) {
     "first_step" -> "第一步 · 完成 1 项任务"
