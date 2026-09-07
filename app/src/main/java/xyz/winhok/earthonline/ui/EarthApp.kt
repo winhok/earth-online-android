@@ -47,6 +47,7 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
         }
     }
     BackHandler(enabled = ready && tab != 0 && !settings && !editorOpen && !goalOpen && detailId == null && !noteOpen) { tab = 0 }
+    CompositionLocalProvider(LocalEditorSnackbar provides snackbar) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         Scaffold(
@@ -121,4 +122,5 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
         onPostpone = { model.postpone(detailedQuest.id) },
         onState = { model.setQuestState(detailedQuest.id, it); detailId = null },
     )
+    }
 }

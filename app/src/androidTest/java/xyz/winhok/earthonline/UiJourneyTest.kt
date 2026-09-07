@@ -2,7 +2,12 @@ package xyz.winhok.earthonline
 
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
+import android.graphics.Bitmap
+import java.io.File
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
 import org.junit.*
@@ -12,18 +17,36 @@ import xyz.winhok.earthonline.core.ProgressRules
 
 @RunWith(AndroidJUnit4::class)
 class UiJourneyTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
-    private val repo get() = (compose.activity.application as EarthApplication).repository
+    @get:Rule val compose = createEmptyComposeRule()
+    private lateinit var scenario: ActivityScenario<MainActivity>
+    private val app get() = ApplicationProvider.getApplicationContext<EarthApplication>()
+    private val repo get() = app.repository
     private fun await(matcher: SemanticsMatcher) {
-        compose.waitUntil(15_000) { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        try {
+            compose.waitUntil(15_000) { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        } catch (failure: Exception) {
+            val world = runBlocking { repo.snapshot() }
+            try {
+                val image = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+                if (image != null) {
+                    val dir = File(app.getExternalFilesDir(null), "acceptance").apply { mkdirs() }
+                    File(dir, "ui-journey-failure.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    image.recycle()
+                }
+            } catch (_: Exception) { /* Retain the original failure even if screenshot capture fails. */ }
+            throw AssertionError("UI wait failed: ${matcher.description}; onboarded=${world.player.onboarded}; tasks=${world.quests.size}", failure)
+        }
     }
     @Before fun reset() {
+        // Reset before creating the Activity/ViewModel, not concurrently with its initial load.
         runBlocking { repo.reset() }
-        // Await the repository emission, not a stale button from the previous activity.
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        // Await the clean screen before interacting with its form.
         await(hasTestTag("join-form"))
         compose.onNodeWithTag("join-form").performScrollToNode(hasTestTag("player-name"))
         await(hasTestTag("player-name") and isEnabled())
     }
+    @After fun closeActivity() { scenario.close() }
     private fun join() {
         compose.onNodeWithTag("player-name").performTextReplacement("冒险测试员")
         // The IME changes LazyColumn composition; scroll the form before locating its button.
@@ -61,7 +84,7 @@ class UiJourneyTest {
     @Test fun editorDraftSurvivesActivityRecreation() {
         join()
         openEditor("旋转后保留草稿")
-        compose.activityRule.scenario.recreate()
+        scenario.recreate()
         await(hasTestTag("quest-title") and hasText("旋转后保留草稿"))
         compose.onNodeWithTag("quest-title").assertTextContains("旋转后保留草稿")
         compose.onNodeWithText("保存").performClick()

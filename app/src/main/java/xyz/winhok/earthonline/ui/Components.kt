@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -18,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import xyz.winhok.earthonline.core.*
+
+// Full-screen editors are separate windows; expose feedback in the active window.
+val LocalEditorSnackbar = staticCompositionLocalOf<SnackbarHostState?> { null }
 
 @Composable
 fun PlanetMark(modifier: Modifier = Modifier) {
@@ -90,9 +94,11 @@ fun QuestCard(quest: Quest, day: Long, done: Boolean, busy: Boolean,
 @Composable
 fun EditorFrame(title: String, busy: Boolean, canSave: Boolean, onDismiss: () -> Unit, onSave: () -> Unit,
                 content: @Composable (PaddingValues) -> Unit) {
+    val snackbar = LocalEditorSnackbar.current
     Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize()) {
             Scaffold(
+                snackbarHost = { snackbar?.let { SnackbarHost(it) } },
                 topBar = {
                     TopAppBar(title = { Text(title) }, navigationIcon = {
                         IconButton(onClick = onDismiss, enabled = !busy) { Icon(Icons.Default.Close, "关闭编辑") }

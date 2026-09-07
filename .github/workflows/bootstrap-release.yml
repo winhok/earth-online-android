@@ -71,6 +71,7 @@ jobs:
             core/build/test-results/
             app/build/reports/
             app/schemas/
+            gradle/wrapper/gradle-wrapper.jar
           retention-days: 90
       - name: Remove plaintext signing material
         if: always()
@@ -112,7 +113,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: bash scripts/emulator-acceptance.sh && python3 scripts/release-smoke.py release-output/earth-online-1.0.0.apk
+          script: bash scripts/release-acceptance.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -139,6 +140,8 @@ jobs:
         with:
           pattern: release-device-api-*
           path: device-evidence
+      - name: Cross-check every test and the exact tested APK
+        run: python3 scripts/verify-release-evidence.py release-output device-evidence
       - name: Publish only the fully tested signed binary
         env:
           GH_TOKEN: ${{ github.token }}
@@ -149,4 +152,4 @@ jobs:
             release-output/SHA256SUMS.txt release-output/app-signing-certificate.crt \
             release-output/certificate-sha256.txt release-output/source-commit.txt \
             release-output/apk-signature-verification.txt release-output/apk-manifest-summary.txt \
-            release-output/device-acceptance-evidence.tar.gz
+            release-output/acceptance-summary.json release-output/device-acceptance-evidence.tar.gz

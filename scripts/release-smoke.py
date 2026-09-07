@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import time
+import traceback
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -67,7 +68,9 @@ def hide_keyboard() -> None:
 
 
 def click(value: str, scroll: bool = False) -> None:
+    print('RELEASE_UI_CLICK', value, flush=True)
     if scroll:
+        hide_keyboard()
         for _ in range(7):
             found = [n for n in dump().iter('node') if is_label(value)(n)]
             if found:
@@ -175,9 +178,9 @@ def main() -> None:
 
 try:
     main()
-except Exception as exc:
+except Exception:
     screenshot('failure')
-    (OUT / 'failure.txt').write_text(repr(exc))
+    (OUT / 'failure.txt').write_text(traceback.format_exc())
     raise
 finally:
     (OUT / 'results.json').write_text(json.dumps({'passed_checks': results}, indent=2))
