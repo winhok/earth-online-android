@@ -1,0 +1,21 @@
+name: Retire superseded signing candidate
+on:
+  push:
+    branches: ['release/v1.0.0']
+    paths: ['release/recovery-certificate.crt']
+permissions:
+  actions: write
+  contents: read
+jobs:
+  stop-superseded:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel only the obsolete first-release candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          state=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/34193866933" --jq .status)
+          if [ "$state" != completed ]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/34193866933/cancel"
+          fi
