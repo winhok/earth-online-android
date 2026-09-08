@@ -1,0 +1,282 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-08T14:34:34Z",
+  "title": "Design System: 地球 Online",
+  "extensions": {
+    "colorMeta": {
+      "action-green": {
+        "role": "primary",
+        "displayName": "行动翡翠",
+        "canonical": "#176B47",
+        "tonalRamp": ["#062116", "#0B3825", "#105238", "#176B47", "#3E8A65", "#74B18D", "#B0D8C0", "#EDF8F1"]
+      },
+      "action-on-green": {
+        "role": "neutral",
+        "displayName": "行动白",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["#111713", "#253029", "#435047", "#68736B", "#929A94", "#BCC1BD", "#E2E5E3", "#FFFFFF"]
+      },
+      "action-green-soft": {
+        "role": "primary",
+        "displayName": "灵气浅翠",
+        "canonical": "#C7EFD8",
+        "tonalRamp": ["#062116", "#0B3825", "#105238", "#176B47", "#3E8A65", "#74B18D", "#C7EFD8", "#EDF8F1"]
+      },
+      "action-green-ink": {
+        "role": "primary",
+        "displayName": "灵气深墨",
+        "canonical": "#092F1D",
+        "tonalRamp": ["#061B12", "#092F1D", "#105238", "#176B47", "#3E8A65", "#74B18D", "#B0D8C0", "#EDF8F1"]
+      },
+      "reward-gold": {
+        "role": "secondary",
+        "displayName": "奖励金",
+        "canonical": "#775B22",
+        "tonalRamp": ["#211702", "#382803", "#543D0B", "#775B22", "#A17C36", "#C9A760", "#EACF96", "#FFF3D5"]
+      },
+      "reward-on-gold": {
+        "role": "neutral",
+        "displayName": "奖励白",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["#1D170B", "#352B18", "#51452C", "#74664A", "#9B8F73", "#C1B8A1", "#E6E1D5", "#FFFFFF"]
+      },
+      "reward-gold-soft": {
+        "role": "secondary",
+        "displayName": "战利品金箔",
+        "canonical": "#FAE5B5",
+        "tonalRamp": ["#211702", "#382803", "#543D0B", "#775B22", "#A17C36", "#C9A760", "#FAE5B5", "#FFF3D5"]
+      },
+      "reward-gold-ink": {
+        "role": "secondary",
+        "displayName": "奖励深褐",
+        "canonical": "#302207",
+        "tonalRamp": ["#1A1202", "#302207", "#543D0B", "#775B22", "#A17C36", "#C9A760", "#EACF96", "#FFF3D5"]
+      },
+      "earth-paper": {
+        "role": "neutral",
+        "displayName": "地表纸白",
+        "canonical": "#F7FAF4",
+        "tonalRamp": ["#101713", "#17251C", "#263B2F", "#405345", "#64766A", "#91A096", "#C5CEC7", "#F7FAF4"]
+      },
+      "earth-ink": {
+        "role": "neutral",
+        "displayName": "地核墨色",
+        "canonical": "#17251C",
+        "tonalRamp": ["#101713", "#17251C", "#263B2F", "#405345", "#64766A", "#91A096", "#C5CEC7", "#F7FAF4"]
+      },
+      "earth-mist": {
+        "role": "neutral",
+        "displayName": "薄雾表面",
+        "canonical": "#E2EBDF",
+        "tonalRamp": ["#101713", "#17251C", "#263B2F", "#405345", "#64766A", "#91A096", "#E2EBDF", "#F7FAF4"]
+      },
+      "earth-muted": {
+        "role": "neutral",
+        "displayName": "地表次级墨",
+        "canonical": "#405345",
+        "tonalRamp": ["#101713", "#17251C", "#263B2F", "#405345", "#64766A", "#91A096", "#C5CEC7", "#F7FAF4"]
+      },
+      "night-action-green": {
+        "role": "primary",
+        "displayName": "夜航灵光",
+        "canonical": "#81D9B3",
+        "tonalRamp": ["#062116", "#0B3825", "#1D4B37", "#28684B", "#3F8965", "#81D9B3", "#C6F9DC", "#EEFFF5"]
+      },
+      "night-action-ink": {
+        "role": "primary",
+        "displayName": "夜航深墨",
+        "canonical": "#053826",
+        "tonalRamp": ["#041C13", "#053826", "#1D4B37", "#28684B", "#3F8965", "#81D9B3", "#C6F9DC", "#EEFFF5"]
+      },
+      "night-action-green-deep": {
+        "role": "primary",
+        "displayName": "深翠容器",
+        "canonical": "#1D4B37",
+        "tonalRamp": ["#062116", "#0B3825", "#1D4B37", "#28684B", "#3F8965", "#81D9B3", "#C6F9DC", "#EEFFF5"]
+      },
+      "night-action-green-soft": {
+        "role": "primary",
+        "displayName": "夜航浅翠",
+        "canonical": "#C6F9DC",
+        "tonalRamp": ["#062116", "#0B3825", "#1D4B37", "#28684B", "#3F8965", "#81D9B3", "#C6F9DC", "#EEFFF5"]
+      },
+      "night-reward-gold": {
+        "role": "secondary",
+        "displayName": "夜间奖励金",
+        "canonical": "#E4C285",
+        "tonalRamp": ["#211702", "#3F2D08", "#524322", "#7A653A", "#A58A53", "#E4C285", "#FCE5B4", "#FFF8E7"]
+      },
+      "night-reward-ink": {
+        "role": "secondary",
+        "displayName": "夜间奖励墨",
+        "canonical": "#3F2D08",
+        "tonalRamp": ["#211702", "#3F2D08", "#524322", "#7A653A", "#A58A53", "#E4C285", "#FCE5B4", "#FFF8E7"]
+      },
+      "night-reward-gold-deep": {
+        "role": "secondary",
+        "displayName": "深金容器",
+        "canonical": "#524322",
+        "tonalRamp": ["#211702", "#3F2D08", "#524322", "#7A653A", "#A58A53", "#E4C285", "#FCE5B4", "#FFF8E7"]
+      },
+      "night-reward-gold-soft": {
+        "role": "secondary",
+        "displayName": "夜间金箔",
+        "canonical": "#FCE5B4",
+        "tonalRamp": ["#211702", "#3F2D08", "#524322", "#7A653A", "#A58A53", "#E4C285", "#FCE5B4", "#FFF8E7"]
+      },
+      "night-sky": {
+        "role": "tertiary",
+        "displayName": "星轨蓝",
+        "canonical": "#A9CDDD",
+        "tonalRamp": ["#0B1D25", "#173441", "#285061", "#416D7F", "#628FA2", "#86B0C1", "#A9CDDD", "#EDF8FC"]
+      },
+      "night-space": {
+        "role": "neutral",
+        "displayName": "深空玄夜",
+        "canonical": "#101713",
+        "tonalRamp": ["#101713", "#17251C", "#263B2F", "#405345", "#64766A", "#91A096", "#C5CEC7", "#F7FAF4"]
+      },
+      "night-ink": {
+        "role": "neutral",
+        "displayName": "月壤文字",
+        "canonical": "#E2E9E1",
+        "tonalRamp": ["#101713", "#17251C", "#263B2F", "#405345", "#64766A", "#91A096", "#C5CEC7", "#E2E9E1"]
+      },
+      "night-surface": {
+        "role": "neutral",
+        "displayName": "夜间层板",
+        "canonical": "#263B2F",
+        "tonalRamp": ["#101713", "#17251C", "#263B2F", "#405345", "#64766A", "#91A096", "#C5CEC7", "#F7FAF4"]
+      },
+      "night-muted": {
+        "role": "neutral",
+        "displayName": "夜间次级文字",
+        "canonical": "#BDCCC0",
+        "tonalRamp": ["#101713", "#17251C", "#263B2F", "#405345", "#64766A", "#91A096", "#BDCCC0", "#F7FAF4"]
+      },
+      "night-outline": {
+        "role": "neutral",
+        "displayName": "轨道描边",
+        "canonical": "#87978B",
+        "tonalRamp": ["#101713", "#17251C", "#263B2F", "#405345", "#64766A", "#87978B", "#C5CEC7", "#F7FAF4"]
+      },
+      "night-outline-soft": {
+        "role": "neutral",
+        "displayName": "暗轨描边",
+        "canonical": "#3C4D41",
+        "tonalRamp": ["#101713", "#17251C", "#263B2F", "#3C4D41", "#64766A", "#91A096", "#C5CEC7", "#F7FAF4"]
+      }
+    },
+    "typographyMeta": {
+      "display": {"displayName": "里程碑标题", "purpose": "角色、宣言和大型突破信息。"},
+      "headline": {"displayName": "成长数值", "purpose": "等级、XP、推荐任务和统计数值。"},
+      "title": {"displayName": "模块标题", "purpose": "顶栏、卡片组和核心模块。"},
+      "body": {"displayName": "行动正文", "purpose": "任务说明、日志与需要完整阅读的内容。"},
+      "label": {"displayName": "状态标签", "purpose": "XP、优先级、难度、日期与筛选状态。"}
+    },
+    "breakpoints": [
+      {"name": "navigation-rail", "value": "720dp"}
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "接取、查看或确认完成时的唯一主动作。",
+      "html": "<button class=\"ds-btn-primary\">确认完成</button>",
+      "css": ".ds-btn-primary{min-height:48px;padding:8px 24px;border:0;border-radius:12px;background:#176B47;color:#fff;font:500 14px/20px Roboto,sans-serif;transition:filter .16s ease,transform .16s ease}.ds-btn-primary:hover{filter:brightness(1.08)}.ds-btn-primary:active{transform:scale(.98)}.ds-btn-primary:focus-visible{outline:3px solid #81D9B3;outline-offset:3px}"
+    },
+    {
+      "name": "Outlined Action Button",
+      "kind": "button",
+      "refersTo": "button-outlined",
+      "description": "导入、导出、编辑和撤销等次级动作。",
+      "html": "<button class=\"ds-btn-outlined\">撤销本次完成</button>",
+      "css": ".ds-btn-outlined{min-height:48px;padding:8px 24px;border:1px solid #405345;border-radius:12px;background:transparent;color:#176B47;font:500 14px/20px Roboto,sans-serif;transition:background .16s ease,transform .16s ease}.ds-btn-outlined:hover{background:#E2EBDF}.ds-btn-outlined:active{transform:scale(.98)}.ds-btn-outlined:focus-visible{outline:3px solid #81D9B3;outline-offset:3px}"
+    },
+    {
+      "name": "Outlined Field",
+      "kind": "input",
+      "refersTo": "field-outlined",
+      "description": "任务、玩家与服务器信息的全宽输入控件。",
+      "html": "<label class=\"ds-field\"><span>任务标题</span><input value=\"完成今天的主线任务\" /></label>",
+      "css": ".ds-field{display:grid;gap:4px;color:#405345;font:400 12px/16px Roboto,sans-serif}.ds-field input{min-height:56px;padding:0 16px;border:1px solid #405345;border-radius:12px;background:#F7FAF4;color:#17251C;font:400 16px/24px Roboto,sans-serif;transition:border-color .16s ease,box-shadow .16s ease}.ds-field input:hover{border-color:#176B47}.ds-field input:focus-visible{outline:0;border-color:#176B47;box-shadow:0 0 0 2px #C7EFD8}"
+    },
+    {
+      "name": "Selected Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "时间、精力、难度和主线等已选筛选条件。",
+      "html": "<button class=\"ds-chip-selected\">高精力</button>",
+      "css": ".ds-chip-selected{min-height:48px;padding:0 16px;border:0;border-radius:12px;background:#FAE5B5;color:#302207;font:500 14px/20px Roboto,sans-serif;transition:filter .16s ease,transform .16s ease}.ds-chip-selected:hover{filter:brightness(.97)}.ds-chip-selected:active{transform:scale(.98)}.ds-chip-selected:focus-visible{outline:3px solid #E4C285;outline-offset:2px}"
+    },
+    {
+      "name": "Quest Card",
+      "kind": "card",
+      "refersTo": "card-quest",
+      "description": "可进入、可完成的现实任务基础容器。",
+      "html": "<article class=\"ds-quest-card\"><div><h3>完成今天的主线任务</h3><p>45 分钟 · 今天到期 · 成长</p><footer><strong>+25 XP</strong><span>P1 · 标准</span></footer></div><button aria-label=\"完成任务\">✓</button></article>",
+      "css": ".ds-quest-card{display:flex;justify-content:space-between;gap:12px;padding:16px;border:1px solid #AAB8AD;border-radius:20px;background:#F7FAF4;color:#17251C;font-family:Roboto,sans-serif}.ds-quest-card h3{margin:0 0 6px;font-size:16px;line-height:24px}.ds-quest-card p{margin:0 0 8px;color:#405345;font-size:12px;line-height:16px}.ds-quest-card footer{display:flex;gap:10px;font-size:12px;line-height:16px}.ds-quest-card strong{color:#176B47}.ds-quest-card button{width:48px;height:48px;border:0;border-radius:16px;background:#C7EFD8;color:#092F1D;font-size:22px}.ds-quest-card:hover{border-color:#176B47}.ds-quest-card:focus-within{outline:3px solid #81D9B3;outline-offset:3px}"
+    },
+    {
+      "name": "Next Quest Reward Card",
+      "kind": "card",
+      "refersTo": "card-reward",
+      "description": "把当前最值得完成的任务提升为一场可立即通关的挑战。",
+      "html": "<article class=\"ds-reward-card\"><small>NEXT QUEST</small><h2>击败本日 Boss</h2><p>高优先级 · 今天到期 · 主线任务</p><button>查看任务</button></article>",
+      "css": ".ds-reward-card{padding:22px;border-radius:20px;background:#FAE5B5;color:#302207;font-family:Roboto,sans-serif}.ds-reward-card small{font-weight:700;letter-spacing:.06em}.ds-reward-card h2{margin:10px 0 6px;font-size:24px;line-height:32px}.ds-reward-card p{margin:0 0 14px;font-size:14px;line-height:20px}.ds-reward-card button{min-height:48px;padding:8px 24px;border:0;border-radius:12px;background:#176B47;color:#fff;font-weight:500}.ds-reward-card button:hover{filter:brightness(1.08)}.ds-reward-card button:active{transform:scale(.98)}.ds-reward-card button:focus-visible{outline:3px solid #81D9B3;outline-offset:3px}"
+    },
+    {
+      "name": "Active Navigation Destination",
+      "kind": "nav",
+      "refersTo": "navigation-active",
+      "description": "手机底栏与宽屏侧栏共享的当前目的地状态。",
+      "html": "<button class=\"ds-nav-active\"><span aria-hidden=\"true\">◎</span><strong>指挥台</strong></button>",
+      "css": ".ds-nav-active{display:grid;justify-items:center;gap:4px;min-width:80px;min-height:64px;padding:6px 12px;border:0;border-radius:28px;background:#C7EFD8;color:#092F1D;font:500 12px/16px Roboto,sans-serif}.ds-nav-active span{font-size:24px}.ds-nav-active:hover{filter:brightness(.97)}.ds-nav-active:active{transform:scale(.98)}.ds-nav-active:focus-visible{outline:3px solid #81D9B3;outline-offset:2px}"
+    },
+    {
+      "name": "Planet Mark",
+      "kind": "custom",
+      "description": "地球唯一服的星球与金色轨道签名。",
+      "html": "<svg class=\"ds-planet-mark\" viewBox=\"0 0 108 108\" role=\"img\" aria-label=\"地球 Online\"><circle cx=\"54\" cy=\"54\" r=\"28\" fill=\"#C7EFD8\"/><path fill=\"#176B47\" d=\"M32 40l11-4 7 7-3 9-10 3-7-5zm21 16 12-8 13 6-3 12-9 4-4 10-8-7zm4-28 11 4-6 7-9-4z\"/><path d=\"M23 62c7 11 59-19 62-15 8 12-49 43-62 15\" fill=\"none\" stroke=\"#775B22\" stroke-width=\"2.5\"/></svg>",
+      "css": ".ds-planet-mark{display:block;width:76px;height:76px;filter:drop-shadow(0 6px 14px rgba(23,107,71,.16));transition:transform .2s ease}.ds-planet-mark:hover{transform:rotate(-3deg) scale(1.03)}.ds-planet-mark:focus-visible{outline:3px solid #81D9B3;outline-offset:4px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "唯一服 · 单向时间 · 现实结算",
+    "overview": "地球 Online 把现实生活视作一场无法重开的限时冒险。应用可以离线，但人生始终在线；界面不是一张安静等待遗忘的 To-do 清单，而是一台把承诺、行动、代价与成长如实结算的玩家终端。\n\n底层事实只有一份，地球原生、修仙、武侠等体系是可以随时切换的叙事解释器。它们可以改变名称、图标、配色、触觉与结算演出，却不能改变任务、奖励、代价或历史。这份“爽感”来自确定、强烈、可追溯的行动反馈；这份重量来自公开、有限、可修复的失约代价，而不是随机惩罚或羞辱。\n\n当前实现是地球原生体系的视觉基线：翡翠绿承载行动，稀缺金色标记奖励和关键突破，深空底色提示“唯一服务器”。Material 3 的原生结构确保任何叙事体系都不会牺牲手机效率和可访问性。",
+    "keyCharacteristics": [
+      "现实任务拥有副本目标般的清晰入口和完成出口。",
+      "XP、等级、技能、连续行动与 Boss 状态构成稳定的成长回路。",
+      "翡翠绿负责“现在就行动”，奖励金只在结算与突破时爆发。",
+      "圆润的 Material 3 容器保留亲和力，标题、数字和结算信息负责力量感。",
+      "世界观服务于行动；叙事可以切换，底层事实和交互位置保持稳定。"
+    ],
+    "rules": [
+      {"name": "The Two-Energy Rule", "body": "翡翠只表达行动与有效成长，金色只表达奖励、Boss 和突破；同一屏不再增加第三种高饱和竞争色。", "section": "colors"},
+      {"name": "The Reward Rarity Rule", "body": "金色必须稀缺。若普通设置、导航和说明文字都变成金色，通关就不再像通关。", "section": "colors"},
+      {"name": "The Semantic Palette Rule", "body": "叙事体系可以替换具体色相，但行动、奖励、警告、失败和恢复的语义角色必须一一对应，并同时满足日间、夜间和对比度要求。", "section": "colors"},
+      {"name": "The Numbers Hit First Rule", "body": "等级、XP、连击天数与 Boss 进度必须先于解释文字被看见；数字承担力量感，正文承担可信度。", "section": "typography"},
+      {"name": "The Interpreter Rule", "body": "叙事体系改变名称和气质，不改变信息层级。修仙不用难读的书法体，武侠不用仿古卷轴牺牲正文；所有体系继续服从 Android 可读性。", "section": "typography"},
+      {"name": "The One Next Move Rule", "body": "每个页面优先暴露一个最值得立即执行的动作；手机以单个 FAB 或单个主按钮承载，不堆叠多个同等级召唤。", "section": "layout"},
+      {"name": "The Grounded Power Rule", "body": "平时界面稳稳落在地面上，只有当前行动、关键结算和系统级浮层获得明显高度；到处悬浮会稀释突破时刻。", "section": "elevation"}
+    ],
+    "dos": [
+      "Do 让接取、完成、XP 增长、等级推进和 Boss 状态形成一眼可读的连续反馈。",
+      "Do 把最强对比、最大数字和最稀缺金色留给通关、奖励与突破时刻。",
+      "Do 使用 Material 3 组件、语义色、状态层、48dp 触控目标和系统返回行为承载所有刺激感。",
+      "Do 同时维护日间与夜间方案，并在大字体、窄屏、宽屏和键盘弹出时保持下一步动作可见。",
+      "Do 让体系切换即时重绘同一份历史，稳定保留任务、XP、代价、完成身份和审计事实。",
+      "Do 在失约前公开代价，在失约后同时展示损失与恢复路径，让惩罚有重量但不成为死局。"
+    ],
+    "donts": [
+      "Don't 把界面做成换了名词的普通 To-do List；没有进度、结算和成长反馈的任务卡不符合这个世界。",
+      "Don't 使用隐藏扣除、按离线天数无限叠加、连续签到损失或赌场式随机惩罚制造伪刺激。",
+      "Don't 让金色、粒子、发光和大标题同时出现在所有区域；没有静默期就没有爆发。",
+      "Don't 引入难读的古风字体、仿羊皮纸纹理或密集战斗 HUD，破坏现代 Android 的效率与可访问性。",
+      "Don't 用主题装饰遮挡真实任务标题、截止信息、完成按钮或撤销入口。",
+      "Don't 让任何叙事体系修改奖励公式、代价规则、存档结构或完成历史；换体系不是换账号，更不是数值漏洞。"
+    ]
+  }
+}
