@@ -1,0 +1,43 @@
+{
+  "title": "锁定宗门战令的手机首屏构图",
+  "question": "三张构图共享同一产品事实和视觉世界，只改变层级、密度与交互框架。请选择一张作为后续 Android 实现的 Comp-first 契约。",
+  "options": [
+    {
+      "id": "battle-pass",
+      "label": "战令修行轨",
+      "kicker": "THE ROLL",
+      "lineage": "已选宗门战令方向稿",
+      "thesis": "一枚 Next Quest 玉简占据首屏中心，境界与债务在上，今日任务沿纵向修行轨继续向下。",
+      "palette": ["#071A16", "#26C281", "#D6A84A", "#E5483F", "#EAF4EC"],
+      "materials": ["黑漆玉简", "稀缺金箔", "朱砂劫痕", "星轨蚀刻"],
+      "viewport": "顶部体系切换和境界战况，中部唯一主导任务玉简，下部修行轨与四目的地导航。",
+      "risk": "主卡冲击最强，但纵向轨道容纳大量任务时需要克制重复装饰。",
+      "comp": ".impeccable/mocks/decision/v2-battle-pass.webp"
+    },
+    {
+      "id": "jade-stack",
+      "label": "叠层玉简",
+      "lineage": "宗门任务匣 × 可抽出契约栈",
+      "thesis": "三枚按责任排序的玉简直接堆叠成任务面板，选中项抽出并露出日期、奖励与完成动作。",
+      "palette": ["#071A16", "#26C281", "#D6A84A", "#E5483F", "#EAF4EC"],
+      "materials": ["黑漆玉简", "金箔契印", "朱砂侧签", "星轨刻线"],
+      "viewport": "顶部压缩为境界与修为债状态条，主体是高密度玉简栈，底部保留稳定导航。",
+      "risk": "扫读效率最高，但必须避免像仓库清单，Next Quest 仍需形成绝对层级。",
+      "comp": ".impeccable/mocks/decision/v2-jade-stack.webp"
+    },
+    {
+      "id": "command-drawer",
+      "label": "上下分舱",
+      "lineage": "宗门战况舱 × Android 任务抽屉",
+      "thesis": "上舱只展示境界、修为和债务因果，下舱以可上推任务抽屉承载 Next Quest 与今日契约。",
+      "palette": ["#071A16", "#26C281", "#D6A84A", "#E5483F", "#EAF4EC"],
+      "materials": ["黑漆状态舱", "玉石抽屉", "金箔刻度", "朱砂裂痕"],
+      "viewport": "上方四成是大胆数值战况，下方六成是可拖动任务抽屉与明确动作。",
+      "risk": "状态与行动分工最清楚，但抽屉若过深会把第二项任务藏得太远。",
+      "comp": ".impeccable/mocks/decision/v2-command-drawer.webp"
+    }
+  ],
+  "reroll": true,
+  "buildPath": {"value": "comp", "toggle": true},
+  "steer": true
+}
