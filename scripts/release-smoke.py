@@ -16,10 +16,8 @@ OUT = Path('verification/release-device')
 OUT.mkdir(parents=True, exist_ok=True)
 results: list[str] = []
 PLATFORM_ANR_TITLES = (
-    "Quickstep isn't responding",
-    "Pixel Launcher isn't responding",
-    "Launcher isn't responding",
-    "System UI isn't responding",
+    "Quickstep isn't responding", "Pixel Launcher isn't responding",
+    "Launcher isn't responding", "System UI isn't responding",
 )
 
 
@@ -28,13 +26,6 @@ def adb(*args: str, check: bool = True) -> str:
     if check and result.returncode:
         raise RuntimeError(f'ADB {args[:3]} failed: {result.stderr[:600]}')
     return result.stdout
-
-
-def raw_dump() -> tuple[ET.Element, str]:
-    adb('shell', 'uiautomator', 'dump', '/sdcard/earth-window.xml')
-    text = adb('shell', 'cat', '/sdcard/earth-window.xml')
-    (OUT / 'last-window.xml').write_text(text)
-    return ET.fromstring(text[text.index('<?xml'):]), text
 
 
 def labels(n: ET.Element) -> list[str]:
@@ -54,30 +45,30 @@ def bounds(n: ET.Element) -> tuple[int, int, int, int]:
 def tap(n: ET.Element) -> None:
     x1, y1, x2, y2 = bounds(n)
     assert n.get('enabled', 'true') == 'true', n.attrib
+    with (OUT / 'interactions.jsonl').open('a') as trace:
+        trace.write(json.dumps({'time': time.monotonic(), 'tap': n.attrib}, ensure_ascii=False) + '\n')
     adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
 
 
-def dismiss_platform_dialog(root: ET.Element) -> bool:
-    """Dismiss emulator/launcher ANRs, but never hide an Earth Online crash/ANR."""
-    visible = [text for n in root.iter('node') for text in labels(n) if text]
-    title = next((text for text in visible if text in PLATFORM_ANR_TITLES), None)
-    if title is None:
-        return False
-    wait = [n for n in root.iter('node') if n.get('text') in ('Wait', '等待')]
-    if not wait:
-        raise AssertionError(f'Platform ANR is blocking the app and has no Wait action: {title}')
-    print('RELEASE_RECOVER_PLATFORM_DIALOG', title, flush=True)
-    tap(wait[-1])
-    time.sleep(1.0)
-    adb('shell', 'am', 'start', '-W', '-n', PACKAGE + '/.MainActivity', check=False)
-    time.sleep(.5)
-    return True
+def raw_dump() -> ET.Element:
+    adb('shell', 'uiautomator', 'dump', '/sdcard/earth-window.xml')
+    text = adb('shell', 'cat', '/sdcard/earth-window.xml')
+    (OUT / 'last-window.xml').write_text(text)
+    return ET.fromstring(text[text.index('<?xml'):])
 
 
 def dump() -> ET.Element:
-    root, _ = raw_dump()
-    if dismiss_platform_dialog(root):
-        root, _ = raw_dump()
+    root = raw_dump()
+    visible = [text for n in root.iter('node') for text in labels(n) if text]
+    title = next((text for text in visible if text in PLATFORM_ANR_TITLES), None)
+    if title is not None:
+        # Only recover a named emulator/launcher failure. Never dismiss this app's ANR.
+        wait = [n for n in root.iter('node') if n.get('text') in ('Wait', '等待')]
+        assert wait, f'Platform dialog has no Wait action: {title}'
+        print('RELEASE_RECOVER_PLATFORM_DIALOG', title, flush=True)
+        tap(wait[-1]); time.sleep(1)
+        adb('shell', 'am', 'start', '-W', '-n', PACKAGE + '/.MainActivity', check=False)
+        root = raw_dump()
     return root
 
 
@@ -86,8 +77,7 @@ def nodes(predicate, seconds: int = 25) -> list[ET.Element]:
     last = None
     while time.monotonic() < deadline:
         try:
-            root = dump()
-            found = [n for n in root.iter('node') if predicate(n) and n.get('bounds') != '[0,0][0,0]']
+            found = [n for n in dump().iter('node') if predicate(n) and n.get('bounds') != '[0,0][0,0]']
             if found:
                 return found
         except (ValueError, ET.ParseError, RuntimeError) as error:
@@ -96,7 +86,7 @@ def nodes(predicate, seconds: int = 25) -> list[ET.Element]:
     raise AssertionError(f'UI condition did not become true; last error={last}')
 
 
-def wait_absent(predicate, seconds: int = 10) -> None:
+def wait_absent(predicate, seconds: int = 15) -> None:
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         if not any(predicate(n) for n in dump().iter('node')):
@@ -105,32 +95,25 @@ def wait_absent(predicate, seconds: int = 10) -> None:
     raise AssertionError('UI condition did not disappear')
 
 
-def field_for_label(label: str, seconds: int = 25) -> ET.Element:
-    """Choose the editable that geometrically contains its Material field label."""
-    deadline = time.monotonic() + seconds
+def field_for_label(label: str) -> ET.Element:
+    deadline = time.monotonic() + 25
     while time.monotonic() < deadline:
         root = dump()
-        labels_found = [n for n in root.iter('node') if is_label(label)(n)]
+        names = [n for n in root.iter('node') if is_label(label)(n)]
         edits = [n for n in root.iter('node') if n.get('class') == 'android.widget.EditText' and n.get('bounds') != '[0,0][0,0]']
-        for label_node in labels_found:
-            lx1, ly1, lx2, ly2 = bounds(label_node)
-            cx, cy = (lx1 + lx2) // 2, (ly1 + ly2) // 2
-            containing = []
-            for edit in edits:
-                x1, y1, x2, y2 = bounds(edit)
-                if x1 <= cx <= x2 and y1 <= cy <= y2:
-                    containing.append(edit)
+        for name in names:
+            x1, y1, x2, y2 = bounds(name)
+            cx, cy = (x1+x2)//2, (y1+y2)//2
+            containing = [n for n in edits if bounds(n)[0] <= cx <= bounds(n)[2] and bounds(n)[1] <= cy <= bounds(n)[3]]
             if containing:
                 return min(containing, key=lambda n: bounds(n)[1])
-        if labels_found and edits:
+        if names and edits:
             return min(edits, key=lambda n: (bounds(n)[1], bounds(n)[0]))
         time.sleep(.3)
-    raise AssertionError(f'Editable for label {label!r} did not become available')
+    raise AssertionError(f'Editable for {label!r} unavailable')
 
 
 def ime_visible(windows: str) -> bool:
-    # InputMethodManager dumps include historical visibility events. Only a current
-    # input-method window with a surface/on-screen signal is safe to dismiss.
     for block in re.split(r'\n\s*Window #\d+ ', windows)[1:]:
         if 'InputMethod' not in block.splitlines()[0]:
             continue
@@ -151,24 +134,35 @@ def hide_keyboard() -> None:
             if not ime_visible(adb('shell', 'dumpsys', 'window', 'windows')):
                 return
             time.sleep(.2)
+        # A second BACK could navigate out of the app. Never send it blindly.
         print('RELEASE_WARN keyboard_visibility_signal_stale', flush=True)
 
 
 def click(value: str, scroll: bool = False) -> None:
     print('RELEASE_UI_CLICK', value, flush=True)
-    if scroll:
+    if not scroll:
+        tap(max(nodes(is_label(value)), key=lambda n: bounds(n)[3]))
+        return
+    for _ in range(9):
+        # First let the new window appear; an IME may arrive after the initial tap.
+        dump()
         hide_keyboard()
-        for _ in range(7):
-            root = dump()
-            found = [n for n in root.iter('node') if is_label(value)(n)]
-            if found:
-                tap(found[-1]); return
-            size = re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1]
-            w, h = map(int, size)
-            adb('shell', 'input', 'swipe', str(w//2), str(int(h*.78)), str(w//2), str(int(h*.38)), '300')
-        raise AssertionError(f'Could not scroll to {value}')
-    candidates = nodes(is_label(value))
-    tap(max(candidates, key=lambda n: bounds(n)[3]))
+        root = dump()
+        found = [n for n in root.iter('node') if is_label(value)(n)]
+        if found:
+            tap(found[-1]); return
+        w, h = map(int, re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1])
+        scrolling = [n for n in root.iter('node') if n.get('scrollable') == 'true' and n.get('package') == PACKAGE]
+        assert scrolling, f'No scrollable app content while searching for {value}'
+        container = max(scrolling, key=lambda n: (bounds(n)[2]-bounds(n)[0])*(bounds(n)[3]-bounds(n)[1]))
+        x1, y1, x2, y2 = bounds(container)
+        # Stay inside the content margin and above any delayed keyboard, not on its keys.
+        x = min(w-12, x2-12)
+        start_y = min(y2-24, int(h*.50))
+        end_y = max(y1+24, int(h*.23))
+        assert start_y > end_y + 50, (container.attrib, value)
+        adb('shell', 'input', 'swipe', str(x), str(start_y), str(x), str(end_y), '350')
+    raise AssertionError(f'Could not scroll to {value}')
 
 
 def screenshot(name: str) -> None:
@@ -183,31 +177,23 @@ def ok(name: str) -> None:
 
 def enter_text(field: ET.Element, text: str) -> None:
     tap(field)
+    nodes(lambda n: n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true')
     adb('shell', 'input', 'text', text)
-
-
-def ensure_task_visible(title: str) -> None:
-    # Saving is asynchronous. Require the editor to close and the task list to settle
-    # before asserting persistence; never turn a failed save into a passing test.
-    wait_absent(is_label('任务标题'), seconds=15)
-    nodes(is_label('任务日志'), seconds=15)
-    click('进行中')
-    nodes(is_label(title), seconds=20)
+    nodes(lambda n: n.get('class') == 'android.widget.EditText' and n.get('text') == text)
 
 
 def create_task(title: str) -> None:
     click('接取任务')
     nodes(is_label('接取新任务'))
-    field = field_for_label('任务标题')
-    enter_text(field, title)
-    hide_keyboard()
-    click('保存')
-    ensure_task_visible(title)
+    enter_text(field_for_label('任务标题'), title)
+    hide_keyboard(); click('保存')
+    wait_absent(is_label('任务标题'))
+    nodes(is_label('任务日志'))
+    click('进行中'); nodes(is_label(title))
 
 
 def main() -> None:
-    apk = Path(sys.argv[1])
-    assert apk.is_file()
+    apk = Path(sys.argv[1]); assert apk.is_file()
     (OUT / 'apk-sha256.txt').write_text(hashlib.sha256(apk.read_bytes()).hexdigest() + '\n')
     adb('install', '--no-streaming', str(apk))
     ok('exact_signed_apk_installs')
@@ -215,40 +201,23 @@ def main() -> None:
     adb('shell', 'svc', 'data', 'disable', check=False)
     adb('shell', 'am', 'start', '-W', '-n', PACKAGE + '/.MainActivity')
     nodes(is_label('地球 Online'))
-    field = field_for_label('玩家名')
-    enter_text(field, 'ReleaseTester')
-    hide_keyboard()
-    click('创建本地角色', scroll=True)
-    nodes(is_label('指挥台'))
-    ok('offline_onboarding')
-    screenshot('01-dashboard')
-
-    click('任务')
-    create_task('ReleaseSmokeTask')
-    ok('create_task')
-    click('完成任务：ReleaseSmokeTask')
-    click('已完成')
-    nodes(is_label('ReleaseSmokeTask'))
-    click('ReleaseSmokeTask')
-    nodes(is_label('撤销本次完成'))
-    ok('completion_is_persisted')
-    click('撤销本次完成')
-    nodes(is_label('确认完成'))
-    click('关闭'); click('进行中')
-    nodes(is_label('ReleaseSmokeTask'))
-    ok('undo_restores_active_task')
-    screenshot('02-quests')
-
+    enter_text(field_for_label('玩家名'), 'ReleaseTester')
+    hide_keyboard(); click('创建本地角色', scroll=True)
+    nodes(is_label('指挥台')); ok('offline_onboarding'); screenshot('01-dashboard')
+    click('任务'); create_task('ReleaseSmokeTask'); ok('create_task')
+    click('完成任务：ReleaseSmokeTask'); click('已完成')
+    nodes(is_label('ReleaseSmokeTask')); click('ReleaseSmokeTask')
+    nodes(is_label('撤销本次完成')); ok('completion_is_persisted')
+    click('撤销本次完成'); nodes(is_label('确认完成'))
+    click('关闭'); click('进行中'); nodes(is_label('ReleaseSmokeTask'))
+    ok('undo_restores_active_task'); screenshot('02-quests')
     adb('shell', 'am', 'force-stop', PACKAGE)
     adb('shell', 'am', 'start', '-W', '-n', PACKAGE + '/.MainActivity')
     nodes(is_label('指挥台')); click('任务'); nodes(is_label('ReleaseSmokeTask'))
     ok('force_stop_and_relaunch_keep_data')
     for label, filename in [('角色', '03-character'), ('日志', '04-journal')]:
         click(label); screenshot(filename)
-
-    click('设置与存档')
-    nodes(is_label('玩家设置'))
-    screenshot('05-settings')
+    click('设置与存档'); nodes(is_label('玩家设置')); screenshot('05-settings')
     click('导出存档', scroll=True)
     save = nodes(lambda n: n.get('text', '').upper() == 'SAVE' or n.get('text') == '保存')[-1]
     tap(save)
@@ -259,37 +228,28 @@ def main() -> None:
     adb('pull', remote, str(OUT / 'exported-test-save.json'))
     envelope = json.loads((OUT / 'exported-test-save.json').read_text())
     payload = json.loads(envelope['payload'])
-    assert payload['player']['name'] == 'ReleaseTester'
-    assert len(payload['quests']) == 1
+    assert payload['player']['name'] == 'ReleaseTester' and len(payload['quests']) == 1
     ok('real_SAF_export_contains_saved_data')
-
-    click('关闭编辑')
-    click('任务')
-    create_task('MustDisappearAfterRestore')
+    click('关闭编辑'); click('任务'); create_task('MustDisappearAfterRestore')
     nodes(is_label('MustDisappearAfterRestore'))
-    click('设置与存档')
-    click('导入存档', scroll=True)
-    chosen = nodes(lambda n: n.get('text') == filename)
-    tap(chosen[0])
-    nodes(is_label('覆盖本机存档？'))
-    click('确认覆盖')
-    nodes(is_label('任务')); click('任务')
-    nodes(is_label('ReleaseSmokeTask'))
+    click('设置与存档'); click('导入存档', scroll=True)
+    tap(nodes(lambda n: n.get('text') == filename)[0])
+    nodes(is_label('覆盖本机存档？')); click('确认覆盖')
+    nodes(is_label('任务')); click('任务'); nodes(is_label('ReleaseSmokeTask'))
     assert not any(is_label('MustDisappearAfterRestore')(n) for n in dump().iter('node'))
-    ok('real_SAF_restore_replaces_only_after_confirmation')
-    screenshot('06-after-restore')
-
+    ok('real_SAF_restore_replaces_only_after_confirmation'); screenshot('06-after-restore')
     crashes = adb('logcat', '-d', '-b', 'crash')
     (OUT / 'crash-log.txt').write_text(crashes)
     assert PACKAGE not in crashes, 'Release app crash appears in crash buffer'
     ok('no_app_crash_in_test_session')
 
 
-try:
-    main()
-except Exception:
-    screenshot('failure')
-    (OUT / 'failure.txt').write_text(traceback.format_exc())
-    raise
-finally:
-    (OUT / 'results.json').write_text(json.dumps({'passed_checks': results}, indent=2))
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception:
+        screenshot('failure')
+        (OUT / 'failure.txt').write_text(traceback.format_exc())
+        raise
+    finally:
+        (OUT / 'results.json').write_text(json.dumps({'passed_checks': results}, indent=2))

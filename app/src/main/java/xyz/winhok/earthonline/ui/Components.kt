@@ -8,16 +8,23 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import xyz.winhok.earthonline.core.*
 
 // Full-screen editors are separate windows; expose feedback in the active window.
@@ -95,14 +102,38 @@ fun QuestCard(quest: Quest, day: Long, done: Boolean, busy: Boolean,
 fun EditorFrame(title: String, busy: Boolean, canSave: Boolean, onDismiss: () -> Unit, onSave: () -> Unit,
                 content: @Composable (PaddingValues) -> Unit) {
     val snackbar = LocalEditorSnackbar.current
-    Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    // Opt in to insets so Android 8-11 use ADJUST_RESIZE rather than covering the form.
+    Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(
+        usePlatformDefaultWidth = false, decorFitsSystemWindows = false,
+    )) {
+        val focus = LocalFocusManager.current
+        val keyboard = LocalSoftwareKeyboardController.current
+        val view = LocalView.current
+        val lightBars = MaterialTheme.colorScheme.background.luminance() > .5f
+        SideEffect {
+            (view.parent as? DialogWindowProvider)?.window?.let { window ->
+                WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = lightBars
+                    isAppearanceLightNavigationBars = lightBars
+                }
+            }
+        }
+        val finishEditing: (() -> Unit) -> Unit = { action ->
+            focus.clearFocus(force = true)
+            keyboard?.hide()
+            action()
+        }
         Surface(Modifier.fillMaxSize()) {
             Scaffold(
                 snackbarHost = { snackbar?.let { SnackbarHost(it) } },
                 topBar = {
                     TopAppBar(title = { Text(title) }, navigationIcon = {
-                        IconButton(onClick = onDismiss, enabled = !busy) { Icon(Icons.Default.Close, "关闭编辑") }
-                    }, actions = { TextButton(onClick = onSave, enabled = canSave && !busy) { Text("保存") } })
+                        IconButton(onClick = { finishEditing(onDismiss) }, enabled = !busy) {
+                            Icon(Icons.Default.Close, "关闭编辑")
+                        }
+                    }, actions = {
+                        TextButton(onClick = { finishEditing(onSave) }, enabled = canSave && !busy) { Text("保存") }
+                    })
                 },
             ) { padding ->
                 Box(Modifier.fillMaxSize().imePadding(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
@@ -119,7 +150,7 @@ fun SmallStat(value: String, label: String, modifier: Modifier = Modifier) {
     Surface(modifier, color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(label, style = MaterialTheme.typography.labelMedium)
         }
     }
 }

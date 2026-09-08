@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.espresso.Espresso
 import android.graphics.Bitmap
 import java.io.File
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -38,10 +39,8 @@ class UiJourneyTest {
         }
     }
     @Before fun reset() {
-        // Reset before creating the Activity/ViewModel, not concurrently with its initial load.
         runBlocking { repo.reset() }
         scenario = ActivityScenario.launch(MainActivity::class.java)
-        // Await the clean screen before interacting with its form.
         await(hasTestTag("join-form"))
         compose.onNodeWithTag("join-form").performScrollToNode(hasTestTag("player-name"))
         await(hasTestTag("player-name") and isEnabled())
@@ -49,16 +48,16 @@ class UiJourneyTest {
     @After fun closeActivity() { scenario.close() }
     private fun join() {
         compose.onNodeWithTag("player-name").performTextReplacement("冒险测试员")
-        // The IME changes LazyColumn composition; scroll the form before locating its button.
+        // Finish IME resizing before scrolling a lazy item into view. Otherwise a
+        // pending bring-into-view request can remove the button between assertion and click.
+        Espresso.closeSoftKeyboard()
+        compose.waitForIdle()
         compose.onNodeWithTag("join-form").performScrollToNode(hasTestTag("join-submit"))
         await(hasTestTag("join-submit") and isEnabled())
-        // Verify visibility, then invoke the UI accessibility action without an IME-animation tap race.
-        // The signed-release black-box suite independently exercises physical ADB taps.
         compose.onNodeWithTag("join-submit").assertIsDisplayed().performSemanticsAction(SemanticsActions.OnClick) { it() }
         await(hasTestTag("create-quest"))
     }
     private fun openEditor(title: String) {
-        // The dashboard also has an off-screen empty-state button with the same text.
         compose.onNodeWithTag("create-quest").performClick()
         await(hasTestTag("quest-title") and isEnabled())
         compose.onNodeWithTag("quest-title").performTextInput(title)
