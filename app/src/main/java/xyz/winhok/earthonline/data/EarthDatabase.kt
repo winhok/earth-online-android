@@ -59,6 +59,15 @@ interface EarthDao {
     @Query("SELECT * FROM quests WHERE id = :id") suspend fun quest(id: String): QuestEntity?
     @Query("SELECT * FROM goals WHERE id = :id") suspend fun goal(id: String): GoalEntity?
     @Query("SELECT * FROM completions WHERE id = :id") suspend fun completion(id: String): CompletionEntity?
+    @Query("SELECT * FROM narrative_preferences WHERE playerId = 1") suspend fun narrativePreference(): NarrativePreferenceEntity?
+    @Query("SELECT * FROM contracts ORDER BY signedAt, id") suspend fun contracts(): List<ContractEntity>
+    @Query("SELECT * FROM contract_revisions ORDER BY createdAt, id") suspend fun contractRevisions(): List<ContractRevisionEntity>
+    @Query("SELECT * FROM consequence_events ORDER BY createdAt, id") suspend fun consequences(): List<ConsequenceEventEntity>
+    @Query("SELECT * FROM consequence_adjustments ORDER BY createdAt, id") suspend fun consequenceAdjustments(): List<ConsequenceAdjustmentEntity>
+    @Query("SELECT * FROM repayment_allocations ORDER BY createdAt, id") suspend fun repaymentAllocations(): List<RepaymentAllocationEntity>
+    @Query("SELECT * FROM clock_boundaries ORDER BY id") suspend fun clockBoundaries(): List<ClockBoundaryEntity>
+    @Query("SELECT * FROM recovery_routes ORDER BY openedAt, id") suspend fun recoveryRoutes(): List<RecoveryRouteEntity>
+    @Query("SELECT * FROM recovery_nodes ORDER BY routeId, position, questId") suspend fun recoveryNodes(): List<RecoveryNodeEntity>
     @Query("SELECT EXISTS(SELECT 1 FROM completions WHERE questId = :questId)") suspend fun hasHistory(questId: String): Boolean
     @Query("SELECT COUNT(*) FROM quests") suspend fun questCount(): Int
     @Query("SELECT COUNT(*) FROM goals") suspend fun goalCount(): Int
@@ -69,6 +78,24 @@ interface EarthDao {
     @Upsert suspend fun putGoal(value: GoalEntity)
     @Upsert suspend fun putCompletion(value: CompletionEntity)
     @Insert suspend fun putEvent(value: EventEntity)
+    @Upsert suspend fun putNarrativePreference(value: NarrativePreferenceEntity)
+    @Upsert suspend fun putContract(value: ContractEntity)
+    @Insert suspend fun putContractRevision(value: ContractRevisionEntity)
+    @Insert suspend fun putConsequence(value: ConsequenceEventEntity)
+    @Insert suspend fun putConsequenceAdjustment(value: ConsequenceAdjustmentEntity)
+    @Insert suspend fun putRepaymentAllocation(value: RepaymentAllocationEntity)
+    @Upsert suspend fun putClockBoundary(value: ClockBoundaryEntity)
+    @Upsert suspend fun putRecoveryRoute(value: RecoveryRouteEntity)
+    @Upsert suspend fun putRecoveryNode(value: RecoveryNodeEntity)
+    @Query("DELETE FROM recovery_nodes") suspend fun clearRecoveryNodes()
+    @Query("DELETE FROM recovery_routes") suspend fun clearRecoveryRoutes()
+    @Query("DELETE FROM repayment_allocations") suspend fun clearRepaymentAllocations()
+    @Query("DELETE FROM consequence_adjustments") suspend fun clearConsequenceAdjustments()
+    @Query("DELETE FROM consequence_events") suspend fun clearConsequences()
+    @Query("DELETE FROM contract_revisions") suspend fun clearContractRevisions()
+    @Query("DELETE FROM contracts") suspend fun clearContracts()
+    @Query("DELETE FROM clock_boundaries") suspend fun clearClockBoundaries()
+    @Query("DELETE FROM narrative_preferences") suspend fun clearNarrativePreferences()
     @Query("DELETE FROM journal") suspend fun clearEvents()
     @Query("DELETE FROM completions") suspend fun clearCompletions()
     @Query("DELETE FROM quests") suspend fun clearQuests()
@@ -77,15 +104,34 @@ interface EarthDao {
 }
 
 @Database(
-    entities = [PlayerEntity::class, GoalEntity::class, QuestEntity::class, CompletionEntity::class, EventEntity::class],
-    version = 1, exportSchema = true,
+    entities = [
+        PlayerEntity::class,
+        GoalEntity::class,
+        QuestEntity::class,
+        CompletionEntity::class,
+        EventEntity::class,
+        NarrativePreferenceEntity::class,
+        ContractEntity::class,
+        ContractRevisionEntity::class,
+        ConsequenceEventEntity::class,
+        ConsequenceAdjustmentEntity::class,
+        RepaymentAllocationEntity::class,
+        ClockBoundaryEntity::class,
+        RecoveryRouteEntity::class,
+        RecoveryNodeEntity::class,
+    ],
+    version = 2, exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class EarthDatabase : RoomDatabase() {
     abstract fun dao(): EarthDao
     companion object {
+        const val EARTH_NATIVE_NARRATIVE_ID = "earth-native"
+        val MIGRATION_1_2 = DatabaseMigrations.V1_TO_V2
+
         fun open(context: Context): EarthDatabase = Room.databaseBuilder(
             context.applicationContext, EarthDatabase::class.java, "earth-online.db"
-        ).build() // Deliberately no fallbackToDestructiveMigration.
+        ).addMigrations(MIGRATION_1_2)
+            .build() // Deliberately no fallbackToDestructiveMigration.
     }
 }

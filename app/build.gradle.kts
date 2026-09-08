@@ -50,6 +50,20 @@ android {
     testOptions { animationsDisabled = true }
     sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
 }
+
+configurations.configureEach {
+    if (name.endsWith("AndroidTestRuntimeClasspath")) {
+        // Room 2.8.4's schema serializers are compiled against 1.8.1, while
+        // an AndroidX SavedState variant constrains the test runtime to 1.7.3.
+        resolutionStrategy.force(
+            "org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1",
+            "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.8.1",
+            "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1",
+            "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.8.1",
+        )
+    }
+}
+
 kotlin { jvmToolchain(17) }
 room { schemaDirectory("$projectDir/schemas") }
 

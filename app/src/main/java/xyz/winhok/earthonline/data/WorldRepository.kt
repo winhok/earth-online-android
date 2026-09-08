@@ -39,6 +39,9 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
         val value = Player(name = name.trim(), server = server.trim(), joinedAt = clock.millis(), onboarded = true)
         QuestRules.validatePlayer(value)
         dao.putPlayer(PlayerEntity(value = value))
+        dao.putNarrativePreference(
+            NarrativePreferenceEntity(narrativeId = EarthDatabase.EARTH_NATIVE_NARRATIVE_ID),
+        )
         event(EventKind.JOINED, value.name)
         // No fake completions or hidden seeded tasks. The first quest is the user's own.
     }
@@ -144,6 +147,9 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
         db.withTransaction {
             clearTables()
             dao.putPlayer(PlayerEntity(value = world.player.copy(remindersEnabled = false, lastReminderDay = null)))
+            dao.putNarrativePreference(
+                NarrativePreferenceEntity(narrativeId = EarthDatabase.EARTH_NATIVE_NARRATIVE_ID),
+            )
             world.goals.forEach { dao.putGoal(GoalEntity(it)) }
             world.quests.forEach { dao.putQuest(QuestEntity(it)) }
             world.completions.forEach { dao.putCompletion(CompletionEntity(it)) }
@@ -158,7 +164,20 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
 
     suspend fun reset() = db.withTransaction { clearTables() }
     private suspend fun clearTables() {
-        dao.clearEvents(); dao.clearCompletions(); dao.clearQuests(); dao.clearGoals(); dao.clearPlayer()
+        dao.clearRecoveryNodes()
+        dao.clearRecoveryRoutes()
+        dao.clearRepaymentAllocations()
+        dao.clearConsequenceAdjustments()
+        dao.clearConsequences()
+        dao.clearContractRevisions()
+        dao.clearContracts()
+        dao.clearClockBoundaries()
+        dao.clearNarrativePreferences()
+        dao.clearEvents()
+        dao.clearCompletions()
+        dao.clearQuests()
+        dao.clearGoals()
+        dao.clearPlayer()
     }
 
     suspend fun claimReminder(day: Long): Boolean = db.withTransaction {
