@@ -111,4 +111,19 @@ class DatabaseTest {
         val results = coroutineScope { List(10) { async { repo.claimReminder(day) } }.awaitAll() }
         assertEquals(1, results.count { it })
     }
+    @Test fun narrativeSwitchPersistsWithoutChangingDomainFacts() = runBlocking {
+        val quest = repo.saveQuest(QuestDraft(title = "真实任务"))
+        repo.complete(quest.id)
+
+        ThemeMode.entries.forEach { theme ->
+            repo.updatePlayer("测试玩家", "测试服", theme, false, 20)
+            val before = repo.snapshot()
+            repo.setNarrativeSystem(NarrativeSystemId.CULTIVATION)
+            assertEquals("cultivation", repo.snapshotBackup().narrativePreference.narrativeId)
+            assertEquals(before, repo.snapshot())
+            repo.setNarrativeSystem(NarrativeSystemId.EARTH_NATIVE)
+            assertEquals("earth-native", repo.snapshotBackup().narrativePreference.narrativeId)
+            assertEquals(before, repo.snapshot())
+        }
+    }
 }

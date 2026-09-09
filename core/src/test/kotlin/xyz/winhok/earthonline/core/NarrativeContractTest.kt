@@ -7,6 +7,71 @@ import org.junit.Test
 
 class NarrativeContractTest {
     @Test
+    fun builtInsRegisterACompleteCultivationShellAndSafeFallback() {
+        val registry = NarrativeRegistry.builtIns()
+        val cultivation = NarrativeSystemId.CULTIVATION
+
+        registry.validate(cultivation)
+        val manifest = registry.manifest(cultivation)
+        assertEquals(setOf(NarrativeLocale.ZH_CN), manifest.locales)
+        assertEquals(NarrativeScheme.entries.toSet(), manifest.schemes)
+        assertEquals(NarrativeCapability.entries.toSet(), manifest.capabilities.keys)
+        assertEquals(DestinationSemantic.entries.toSet(), manifest.inheritedSurfaces)
+        assertEquals(
+            NarrativeSemantics.all - manifest.semanticCapabilities
+                .filterValues { it == SemanticAvailability.UNAVAILABLE }.keys,
+            manifest.catalogEntries + manifest.inheritedCatalogEntries,
+        )
+        assertEquals(cultivation, registry.resolveSystemId("cultivation"))
+        assertEquals(NarrativeSystemId.EARTH_NATIVE, registry.resolveSystemId("missing-system"))
+        assertEquals(NarrativeSystemId.EARTH_NATIVE, registry.resolveSystemId("broken\nid"))
+
+        fun text(key: SemanticKey, arguments: SemanticArguments = SemanticArguments.EMPTY) =
+            registry.interpret(
+                cultivation,
+                SemanticRequest(key, arguments),
+                NarrativeLocale.ZH_CN,
+                NarrativeScheme.DARK,
+            ).text
+
+        assertEquals("历练", text(DestinationSemantic.QUESTS))
+        assertEquals("境界", text(DestinationSemantic.PROFILE))
+        assertEquals("修行志", text(DestinationSemantic.JOURNAL))
+        assertEquals("叙事体系", text(FieldSemantic.NARRATIVE_SYSTEM))
+        assertEquals("修仙 · 宗门战令", text(ScreenSemantic.CULTIVATION_SYSTEM_NAME))
+        assertEquals("每日修行提醒", text(NotificationSemantic.REMINDER_CHANNEL))
+        assertEquals(
+            "还有 2 项可行历练。择一件小事，继续前进。",
+            text(NotificationSemantic.REMINDER_AVAILABLE, semanticArguments {
+                put(SemanticParameters.COUNT, CountValue(2))
+            }),
+        )
+        assertEquals(
+            "完成历练：玩家原文任务 😀",
+            text(ActionSemantic.COMPLETE_QUEST, semanticArguments {
+                put(
+                    SemanticParameters.COMPLETE_QUEST_LABEL,
+                    CompleteQuestLabel(
+                        CompleteQuestLabelStyle.ACCESSIBILITY,
+                        OpaqueText("玩家原文任务 😀"),
+                    ),
+                )
+            }),
+        )
+        assertEquals(
+            "请求的体系 broken id 当前不可用；已使用地球原生，原请求 ID 仍保留在存档中。",
+            registry.interpret(
+                NarrativeSystemId.EARTH_NATIVE,
+                SemanticRequest(ScreenSemantic.NARRATIVE_FALLBACK, semanticArguments {
+                    put(SemanticParameters.NARRATIVE_ID, RequestedNarrativeId("broken\nid"))
+                }),
+                NarrativeLocale.ZH_CN,
+                NarrativeScheme.DARK,
+            ).text,
+        )
+    }
+
+    @Test
     fun earthNativeInterpretsRepresentativeCompletionFromStructuredXp() {
         val presentation = NarrativeRegistry.builtIns().interpret(
             systemId = NarrativeSystemId.EARTH_NATIVE,
@@ -245,7 +310,7 @@ class NarrativeContractTest {
             manifest.semanticCapabilities.getValue(StateSemantic.CONTRACT_OVERDUE),
         )
         assertEquals(
-            SemanticAvailability.UNAVAILABLE,
+            SemanticAvailability.DIRECT_CATALOG,
             manifest.semanticCapabilities.getValue(FieldSemantic.NARRATIVE_SYSTEM),
         )
         assertEquals(
@@ -273,9 +338,8 @@ class NarrativeContractTest {
     }
 
     @Test
-    fun earthNativeInterpretsEveryCatalogEntryWithRepresentativeParameters() {
+    fun builtInNarrativesInterpretEveryCatalogEntryWithRepresentativeParameters() {
         val registry = NarrativeRegistry.builtIns()
-        val definition = registry.definition(NarrativeSystemId.EARTH_NATIVE)
         val day = java.time.LocalDate.of(2026, 9, 10).toEpochDay()
         val samples = mapOf<SemanticParameter<*>, Any>(
             SemanticParameters.XP to XpAmount(25),
@@ -316,18 +380,32 @@ class NarrativeContractTest {
             SemanticParameters.VERSION_NAME to VersionName("2.0-test"),
             SemanticParameters.RESTORE_SUMMARY to RestoreSummary(1, 2, 3, 4, 5, 6, 7, 8),
             SemanticParameters.DELETE_DATA_LABEL to DeleteDataLabel.SETTINGS,
+            SemanticParameters.NARRATIVE_ID to RequestedNarrativeId("future-system"),
         )
 
-        NarrativeScheme.entries.forEach { scheme ->
-            definition.manifest.catalogEntries.forEach { key ->
-                val values = definition.catalog.parameters(key).associateWith(samples::getValue)
-                val presentation = registry.interpret(
-                    NarrativeSystemId.EARTH_NATIVE,
-                    SemanticRequest(key, SemanticArguments.from(values)),
-                    NarrativeLocale.ZH_CN,
-                    scheme,
-                )
-                assertTrue("Blank presentation for ${key.wireId} in ${scheme.wireId}", presentation.text.isNotBlank())
+        registry.systemIds.forEach { systemId ->
+            val definition = registry.definition(systemId)
+            val activeKeys = definition.manifest.catalogEntries +
+                definition.manifest.inheritedCatalogEntries
+            NarrativeScheme.entries.forEach { scheme ->
+                activeKeys.forEach { key ->
+                    val catalog = if (key in definition.manifest.catalogEntries) {
+                        definition.catalog
+                    } else {
+                        registry.definition(registry.defaultSystemId).catalog
+                    }
+                    val values = catalog.parameters(key).associateWith(samples::getValue)
+                    val presentation = registry.interpret(
+                        systemId,
+                        SemanticRequest(key, SemanticArguments.from(values)),
+                        NarrativeLocale.ZH_CN,
+                        scheme,
+                    )
+                    assertTrue(
+                        "Blank presentation for ${systemId.wireId}/${key.wireId} in ${scheme.wireId}",
+                        presentation.text.isNotBlank(),
+                    )
+                }
             }
         }
     }

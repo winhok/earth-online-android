@@ -28,23 +28,35 @@ class MainActivity : ComponentActivity() {
             val state by model.state.collectAsStateWithLifecycle()
             val mode = state.world.player.theme
             val dark = mode == ThemeMode.DARK || (mode == ThemeMode.SYSTEM && isSystemInDarkTheme())
-            DisposableEffect(dark) {
+            val systemId = state.narrativeSystemId
+            DisposableEffect(dark, systemId) {
                 // App theme can differ from the device theme; keep system-bar icons readable.
+                val lightNavigation = if (systemId == NarrativeSystemId.CULTIVATION) {
+                    Color.rgb(234, 244, 236)
+                } else {
+                    Color.rgb(247, 250, 244)
+                }
+                val darkNavigation = if (systemId == NarrativeSystemId.CULTIVATION) {
+                    Color.rgb(7, 26, 22)
+                } else {
+                    Color.rgb(16, 23, 19)
+                }
                 enableEdgeToEdge(
                     statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark },
-                    navigationBarStyle = SystemBarStyle.auto(Color.rgb(247, 250, 244), Color.rgb(16, 23, 19)) { dark },
+                    navigationBarStyle = SystemBarStyle.auto(lightNavigation, darkNavigation) { dark },
                 )
                 onDispose { }
             }
-            val narrative = remember(dark) {
+            val registry = remember { NarrativeRegistry.builtIns() }
+            val narrative = remember(dark, systemId) {
                 RegistryNarrativePresenter(
-                    registry = NarrativeRegistry.builtIns(),
-                    systemId = NarrativeSystemId.EARTH_NATIVE,
+                    registry = registry,
+                    systemId = systemId,
                     locale = NarrativeLocale.ZH_CN,
                     scheme = if (dark) NarrativeScheme.DARK else NarrativeScheme.LIGHT,
                 )
             }
-            EarthTheme(mode) {
+            EarthTheme(mode, systemId) {
                 NarrativeHost(narrative) { EarthApp(model, state) }
             }
         }

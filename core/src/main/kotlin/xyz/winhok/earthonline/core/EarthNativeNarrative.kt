@@ -8,7 +8,6 @@ internal object EarthNativeNarrative {
     val catalogEntries: Set<SemanticKey> get() = catalog().keys
 
     val unavailable = setOf<SemanticKey>(
-        FieldSemantic.NARRATIVE_SYSTEM,
         ActionSemantic.RESCHEDULE_CONTRACT,
         ActionSemantic.ABANDON_CONTRACT,
         ActionSemantic.RECOMMIT_CONTRACT,
@@ -76,6 +75,7 @@ internal object EarthNativeNarrative {
             FieldSemantic.PLAYER_NAME to textEntry("玩家名"),
             FieldSemantic.SERVER_NAME to textEntry("服务器名（自己取一个）"),
             FieldSemantic.THEME to textEntry("界面风格"),
+            FieldSemantic.NARRATIVE_SYSTEM to textEntry("叙事体系"),
             FieldSemantic.REMINDERS to textEntry("开启每日提醒"),
             FieldSemantic.REMINDER_HOUR to textEntry("提醒小时（0–23）"),
             FieldSemantic.DUE_DAY to textEntry("日期"),
@@ -401,6 +401,21 @@ internal object EarthNativeNarrative {
                 } },
             ),
             ScreenSemantic.PLAYER_SETTINGS_TITLE to textEntry("玩家设置"),
+            ScreenSemantic.NARRATIVE_SYSTEM_BODY to textEntry("同一份真实任务、进度与存档，只改变应用内的表达和材质。"),
+            ScreenSemantic.EARTH_NATIVE_SYSTEM_NAME to textEntry("地球原生"),
+            ScreenSemantic.EARTH_NATIVE_SYSTEM_BODY to textEntry("清晰、克制的现实探索终端"),
+            ScreenSemantic.CULTIVATION_SYSTEM_NAME to textEntry("修仙 · 宗门战令"),
+            ScreenSemantic.CULTIVATION_SYSTEM_BODY to textEntry("黑漆玉简、稀缺金箔与朱砂劫痕"),
+            ScreenSemantic.NARRATIVE_PREVIEW_EMPTY to textEntry("接取第一项真实任务后，可在这里对照两套体系。"),
+            ScreenSemantic.NARRATIVE_FALLBACK to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.NARRATIVE_ID),
+                render = { arguments -> NarrativePresentation(
+                    "请求的体系 ${fallbackNarrativeLabel(arguments.require(SemanticParameters.NARRATIVE_ID))} 当前不可用；" +
+                        "已使用地球原生，原请求 ID 仍保留在存档中。",
+                    iconRole = IconRole.WARNING,
+                    colorRole = ColorRole.WARNING,
+                ) },
+            ),
             ScreenSemantic.INTERFACE_STYLE to textEntry("界面风格"),
             ScreenSemantic.THEME_SYSTEM to textEntry("跟随系统"),
             ScreenSemantic.THEME_LIGHT to textEntry("明亮"),
@@ -567,6 +582,13 @@ internal object EarthNativeNarrative {
                 arguments.require(SemanticParameters.DESCRIPTION).value,
         ) },
     )
+
+    private fun fallbackNarrativeLabel(requestedId: RequestedNarrativeId): String =
+        requestedId.value
+            .replace('\n', ' ')
+            .replace('\r', ' ')
+            .take(80)
+            .ifBlank { "（空 ID）" }
 
     private fun textEntry(text: String, iconRole: IconRole = IconRole.NEUTRAL) =
         NarrativeSemanticEntry(

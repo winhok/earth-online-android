@@ -19,6 +19,8 @@ import xyz.winhok.earthonline.reminder.Reminders
 data class EarthUiState(
     val world: World = World(), val now: Long = System.currentTimeMillis(),
     val loading: Boolean = true, val loadError: Boolean = false, val busy: Boolean = false,
+    val requestedNarrativeId: String = NarrativeSystemId.EARTH_NATIVE.wireId,
+    val narrativeSystemId: NarrativeSystemId = NarrativeSystemId.EARTH_NATIVE,
 ) { val day: Long get() = world.dayAt(now) }
 data class UiMessage(
     val request: SemanticRequest,
@@ -29,6 +31,7 @@ private data class LoadedWorld(val world: World = World(), val failed: Boolean =
 @OptIn(ExperimentalCoroutinesApi::class)
 class EarthViewModel(private val app: EarthApplication) : ViewModel() {
     private val repo = app.repository
+    private val narrativeRegistry = NarrativeRegistry.builtIns()
     private val retry = MutableStateFlow(0)
     private val working = MutableStateFlow(false)
     private val channel = Channel<UiMessage>(Channel.BUFFERED)
@@ -41,14 +44,33 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
             emit(LoadedWorld(failed = true))
         }
     }
+    private val requestedNarrativeId = retry.flatMapLatest {
+        repo.observeNarrativeSystemId()
+    }.catch { error ->
+        if (error is CancellationException) throw error
+        emit(NarrativeSystemId.EARTH_NATIVE.wireId)
+    }
     private val ticker = flow { while (true) { emit(System.currentTimeMillis()); delay(15_000) } }
-    val state = combine(world, ticker, working) { loaded, now, busy ->
-        EarthUiState(loaded.world, now, loading = false, loadError = loaded.failed, busy = busy)
+    val state = combine(world, requestedNarrativeId, ticker, working) { loaded, requestedId, now, busy ->
+        EarthUiState(
+            world = loaded.world,
+            now = now,
+            loading = false,
+            loadError = loaded.failed,
+            busy = busy,
+            requestedNarrativeId = requestedId,
+            narrativeSystemId = narrativeRegistry.resolveSystemId(requestedId),
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EarthUiState())
 
     fun retryLoad() { retry.value++ }
     fun notify(key: SemanticKey, arguments: SemanticArguments = SemanticArguments.EMPTY) {
         viewModelScope.launch { channel.send(UiMessage(SemanticRequest(key, arguments))) }
+    }
+    fun switchNarrative(systemId: NarrativeSystemId) = change {
+        narrativeRegistry.validate(systemId)
+        repo.setNarrativeSystem(systemId)
+        configureReminder(repo.snapshot().player.remindersEnabled)
     }
     private fun change(action: suspend () -> Unit) {
         viewModelScope.launch {
@@ -89,7 +111,10 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
     fun archiveGoal(id: String) = change { repo.archiveGoal(id) }
     fun addNote(text: String, success: () -> Unit) = change { repo.addNote(text); success() }
     private suspend fun configureReminder(enabled: Boolean) {
-        try { Reminders.configure(app, enabled) }
+        try {
+            val systemId = narrativeRegistry.resolveSystemId(repo.requestedNarrativeSystemId())
+            Reminders.configure(app, enabled, systemId)
+        }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) {
             channel.send(UiMessage(SemanticRequest(NotificationSemantic.REMINDER_CONFIG_FAILED)))

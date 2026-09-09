@@ -20,6 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -67,11 +68,13 @@ fun SettingsScreen(model: EarthViewModel, state: EarthUiState, onDismiss: () -> 
     EditorFrame(presenter.text(ActionSemantic.OPEN_SETTINGS), state.busy, valid,
         { if (dirty) discard = true else onDismiss() },
         { model.savePlayer(name, server, theme, reminders, hour.toInt(), onDismiss) }) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp),
+        LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("settings-list"),
+            contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             item { SectionTitle(presenter.text(ScreenSemantic.PLAYER_SETTINGS_TITLE)) }
             item { OutlinedTextField(name, { name = it.take(32) }, label = { Text(presenter.text(FieldSemantic.PLAYER_NAME)) },
-                enabled = !state.busy, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+                enabled = !state.busy, singleLine = true,
+                modifier = Modifier.fillMaxWidth().testTag("settings-player-name")) }
             item { OutlinedTextField(server, { server = it.take(40) }, label = { Text(presenter.text(FieldSemantic.SERVER_NAME)) },
                 enabled = !state.busy, singleLine = true, modifier = Modifier.fillMaxWidth()) }
             item {
@@ -81,6 +84,22 @@ fun SettingsScreen(model: EarthViewModel, state: EarthUiState, onDismiss: () -> 
                         onClick = { theme = value }, enabled = !state.busy,
                         label = { Text(presenter.text(value.narrativeKey())) }) }
                 }
+            }
+            item {
+                HorizontalDivider()
+                NarrativeSystemPicker(
+                    selectedSystemId = state.narrativeSystemId,
+                    requestedSystemId = state.requestedNarrativeId,
+                    previewQuest = state.world.quests.firstOrNull {
+                        it.state == QuestState.ACTIVE &&
+                            QuestRules.available(it, state.day) &&
+                            QuestRules.activeCompletion(it, state.world.completions, state.day) == null
+                    }
+                        ?: state.world.quests.firstOrNull(),
+                    day = state.day,
+                    enabled = !state.busy,
+                    onSelect = model::switchNarrative,
+                )
             }
             item { HorizontalDivider(); SectionTitle(
                 presenter.text(ScreenSemantic.REMINDERS_TITLE),

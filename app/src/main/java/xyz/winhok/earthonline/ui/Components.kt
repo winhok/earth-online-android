@@ -32,6 +32,7 @@ val LocalEditorSnackbar = staticCompositionLocalOf<SnackbarHostState?> { null }
 
 @Composable
 fun PlanetMark(modifier: Modifier = Modifier) {
+    val cultivation = LocalNarrativeSystemId.current == NarrativeSystemId.CULTIVATION
     val land = MaterialTheme.colorScheme.primary
     val water = MaterialTheme.colorScheme.primaryContainer
     val ring = MaterialTheme.colorScheme.secondary
@@ -42,6 +43,12 @@ fun PlanetMark(modifier: Modifier = Modifier) {
         drawCircle(land, r * .27f, Offset(center.x - r * .4f, center.y - r * .35f))
         drawArc(ring, 5f, 310f, false, Offset(size.width*.06f, size.height*.25f),
             Size(size.width*.88f, size.height*.5f), style = Stroke(size.width*.025f))
+        if (cultivation) {
+            drawArc(ring, 196f, 238f, false, Offset(size.width*.18f, size.height*.04f),
+                Size(size.width*.64f, size.height*.92f), style = Stroke(size.width*.018f))
+            drawCircle(ring, size.width * .045f, Offset(size.width * .82f, size.height * .34f))
+            drawCircle(land, size.width * .03f, Offset(size.width * .26f, size.height * .12f))
+        }
     }
 }
 

@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import xyz.winhok.earthonline.core.*
 
@@ -45,7 +46,7 @@ fun QuestsScreen(state: EarthUiState, create: () -> Unit, open: (String) -> Unit
         statusMatch && (goalFilter == null || goalFilter == q.goalId) &&
             (q.title.contains(query, true) || q.description.contains(query, true))
     }.sortedWith(compareByDescending<Quest> { it.priority }.thenBy { it.dueDay ?: Long.MAX_VALUE }.thenBy { it.createdAt })
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 104.dp),
+    LazyColumn(Modifier.fillMaxSize().testTag("quests-list"), contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 104.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { SectionTitle(presenter.text(ScreenSemantic.QUESTS_TITLE), presenter.text(ScreenSemantic.QUESTS_BODY)) }
         item { OutlinedTextField(query, { query = it.take(120) }, label = { Text(presenter.text(FieldSemantic.QUEST_SEARCH)) },
@@ -53,7 +54,8 @@ fun QuestsScreen(state: EarthUiState, create: () -> Unit, open: (String) -> Unit
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 filters.forEachIndexed { index, key -> FilterChip(selected = index == filter,
-                    onClick = { filter = index }, label = { Text(presenter.text(key)) }) }
+                    onClick = { filter = index }, modifier = Modifier.testTag("quest-filter-${key.wireId}"),
+                    label = { Text(presenter.text(key)) }) }
             }
         }
         if (filter != 6 && world.goals.isNotEmpty()) item {

@@ -4,6 +4,7 @@ package xyz.winhok.earthonline.core
 value class NarrativeSystemId private constructor(val wireId: String) {
     companion object {
         val EARTH_NATIVE = NarrativeSystemId("earth-native")
+        val CULTIVATION = NarrativeSystemId("cultivation")
 
         fun of(wireId: String): NarrativeSystemId {
             require(wireId.length in 1..80)
@@ -101,6 +102,7 @@ object SemanticParameters {
     val VERSION_NAME = SemanticParameter<VersionName>("version-name")
     val RESTORE_SUMMARY = SemanticParameter<RestoreSummary>("restore-summary")
     val DELETE_DATA_LABEL = SemanticParameter<DeleteDataLabel>("delete-data-label")
+    val NARRATIVE_ID = SemanticParameter<RequestedNarrativeId>("narrative-id")
 }
 
 /** Player-authored text is inserted verbatim and never sent through narrative translation. */
@@ -228,6 +230,9 @@ data class RestoreSummary(
 
 enum class DeleteDataLabel { SETTINGS, CONFIRM }
 
+@JvmInline
+value class RequestedNarrativeId(val value: String)
+
 class SemanticArguments private constructor(
     internal val values: Map<SemanticParameter<*>, Any>,
 ) {
@@ -334,6 +339,13 @@ class NarrativeRegistry private constructor(
     val defaultSystemId: NarrativeSystemId,
     private val systems: Map<NarrativeSystemId, NarrativeSystemDefinition>,
 ) {
+    val systemIds: Set<NarrativeSystemId> get() = systems.keys
+
+    fun resolveSystemId(requestedWireId: String): NarrativeSystemId {
+        val requested = runCatching { NarrativeSystemId.of(requestedWireId) }.getOrNull()
+        return requested?.takeIf(systems::containsKey) ?: defaultSystemId
+    }
+
     fun interpret(
         systemId: NarrativeSystemId,
         request: SemanticRequest,
@@ -455,7 +467,7 @@ class NarrativeRegistry private constructor(
 
         fun builtIns(): NarrativeRegistry = create(
             NarrativeSystemId.EARTH_NATIVE,
-            listOf(EarthNativeNarrative.definition()),
+            listOf(EarthNativeNarrative.definition(), CultivationNarrative.definition()),
         )
     }
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import kotlinx.coroutines.*
 import xyz.winhok.earthonline.data.*
 import xyz.winhok.earthonline.reminder.Reminders
+import xyz.winhok.earthonline.core.NarrativeRegistry
 
 class EarthApplication : Application() {
     val database by lazy { EarthDatabase.open(this) }
@@ -12,7 +13,15 @@ class EarthApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         applicationScope.launch {
-            try { Reminders.configure(this@EarthApplication, repository.snapshot().player.remindersEnabled) }
+            try {
+                val registry = NarrativeRegistry.builtIns()
+                val systemId = registry.resolveSystemId(repository.requestedNarrativeSystemId())
+                Reminders.configure(
+                    this@EarthApplication,
+                    repository.snapshot().player.remindersEnabled,
+                    systemId,
+                )
+            }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { /* Main UI exposes database failures; no private data is logged. */ }
         }

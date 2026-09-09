@@ -45,6 +45,7 @@ fun JoinScreen(busy: Boolean, join: (String, String) -> Unit) {
 fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> Unit, complete: (String) -> Unit,
                     allQuests: () -> Unit, goal: (String?) -> Unit) {
     val presenter = LocalNarrativePresenter.current
+    val cultivation = LocalNarrativeSystemId.current == NarrativeSystemId.CULTIVATION
     var minutes by rememberSaveable { mutableIntStateOf(25) }
     var energy by rememberSaveable { mutableIntStateOf(2) }
     val world = state.world
@@ -108,7 +109,14 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
                 presenter.text(ActionSemantic.CREATE_QUEST),
                 create,
             )
-            else Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+            else Card(
+                modifier = if (cultivation) Modifier.fillMaxWidth() else Modifier,
+                colors = CardDefaults.cardColors(containerColor = if (cultivation) {
+                    MaterialTheme.colorScheme.surfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.secondaryContainer
+                }),
+            ) {
                 Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(presenter.text(ScreenSemantic.NEXT_QUEST), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     Text(recommendation.quest.title, style = MaterialTheme.typography.headlineSmall)

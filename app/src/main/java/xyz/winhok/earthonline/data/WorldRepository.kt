@@ -19,6 +19,14 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
         "player", "quests", "goals", "completions", "journal", emitInitialState = true,
     ).map { snapshot() }
 
+    fun observeNarrativeSystemId(): Flow<String> = db.invalidationTracker.createFlow(
+        "narrative_preferences", emitInitialState = true,
+    ).map { requestedNarrativeSystemId() }
+
+    suspend fun requestedNarrativeSystemId(): String = db.withTransaction {
+        dao.narrativePreference()?.narrativeId ?: EarthDatabase.EARTH_NATIVE_NARRATIVE_ID
+    }
+
     suspend fun snapshot(): World = db.withTransaction { readSnapshot() }
     private suspend fun readSnapshot() = World(
         player = dao.player()?.value ?: Player(), goals = dao.goals().map { it.value },
@@ -65,6 +73,12 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
             remindersEnabled = reminders, reminderHour = hour)
         QuestRules.validatePlayer(value)
         dao.putPlayer(PlayerEntity(value = value))
+        BackupSnapshotBudget.requireFits(readBackupSnapshot())
+    }
+
+    suspend fun setNarrativeSystem(systemId: NarrativeSystemId) = db.withTransaction {
+        player()
+        dao.putNarrativePreference(NarrativePreferenceEntity(narrativeId = systemId.wireId))
         BackupSnapshotBudget.requireFits(readBackupSnapshot())
     }
 

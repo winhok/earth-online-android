@@ -34,13 +34,17 @@ object Reminders {
         (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context,
             Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) &&
             NotificationManagerCompat.from(context).areNotificationsEnabled()
-    fun configure(context: Context, enabled: Boolean) {
+    fun configure(
+        context: Context,
+        enabled: Boolean,
+        systemId: NarrativeSystemId = NarrativeSystemId.EARTH_NATIVE,
+    ) {
         val manager = requireNotNull(context.getSystemService(NotificationManager::class.java)) {
             "NotificationManager unavailable"
         }
         manager.createNotificationChannel(NotificationChannel(
             CHANNEL,
-            narrativeText(NotificationSemantic.REMINDER_CHANNEL),
+            narrativeText(systemId, NotificationSemantic.REMINDER_CHANNEL),
             NotificationManager.IMPORTANCE_DEFAULT,
         ))
         val work = WorkManager.getInstance(context)
@@ -63,6 +67,8 @@ class ReminderWorker(context: Context, parameters: WorkerParameters) : Coroutine
         var claimedDay: Long? = null
         return try {
             val world = repo.snapshot()
+            val registry = NarrativeRegistry.builtIns()
+            val systemId = registry.resolveSystemId(repo.requestedNarrativeSystemId())
             val player = world.player
             if (!player.onboarded || !player.remindersEnabled) return Result.success()
             val now = Instant.now().atZone(ZoneId.of(player.zoneId))
@@ -82,8 +88,8 @@ class ReminderWorker(context: Context, parameters: WorkerParameters) : Coroutine
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val notification = NotificationCompat.Builder(applicationContext, Reminders.CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle(narrativeText(NotificationSemantic.REMINDER_TITLE))
-                .setContentText(narrativeText(NotificationSemantic.REMINDER_AVAILABLE, semanticArguments {
+                .setContentTitle(narrativeText(systemId, NotificationSemantic.REMINDER_TITLE))
+                .setContentText(narrativeText(systemId, NotificationSemantic.REMINDER_AVAILABLE, semanticArguments {
                     put(SemanticParameters.COUNT, CountValue(count))
                 }))
                 .setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true)
@@ -105,10 +111,11 @@ class ReminderWorker(context: Context, parameters: WorkerParameters) : Coroutine
 }
 
 private fun narrativeText(
+    systemId: NarrativeSystemId,
     key: SemanticKey,
     arguments: SemanticArguments = SemanticArguments.EMPTY,
 ): String = NarrativeRegistry.builtIns().interpret(
-    NarrativeSystemId.EARTH_NATIVE,
+    systemId,
     SemanticRequest(key, arguments),
     NarrativeLocale.ZH_CN,
     NarrativeScheme.DARK,
