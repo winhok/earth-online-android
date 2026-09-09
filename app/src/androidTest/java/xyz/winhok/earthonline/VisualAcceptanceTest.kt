@@ -2,6 +2,8 @@ package xyz.winhok.earthonline
 
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
+import org.json.JSONObject
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -58,9 +60,26 @@ class VisualAcceptanceTest {
     private fun capture(name: String) {
         compose.waitForIdle()
         val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
+        val expected = when {
+            name.endsWith("rotated-draft") -> "旋转保留草稿"
+            name.endsWith("200pct-action") -> "确认达成"
+            else -> "地球 Online"
+        }
+        fun nativeContentVisible(): Boolean = automation.rootInActiveWindow
+            ?.findAccessibilityNodeInfosByText(expected)?.any { it.isVisibleToUser } == true
+        // Display/font changes can schedule a second Activity recreation after Compose
+        // first becomes idle. Wait for native content and accessibility events to settle.
+        val deadline = SystemClock.uptimeMillis() + 15_000
+        while (!nativeContentVisible() && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(80)
+        assertTrue("Native content missing before capture: $name", nativeContentVisible())
+        automation.waitForIdle(700, 10_000)
+        assertTrue("Native content was replaced during configuration change: $name", nativeContentVisible())
         val bitmap=requireNotNull(automation.takeScreenshot())
         val dir=File(app.getExternalFilesDir(null),"acceptance").apply { mkdirs() }
         File(dir,"$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) };bitmap.recycle()
+        File(dir,"$name-capture-state.json").writeText(JSONObject()
+            .put("expected_text", expected).put("native_expected_text_visible", true)
+            .put("package", app.packageName).put("settled_accessibility_idle_ms", 700).toString())
         File(dir,"$name-display.txt").writeText(shell("wm size")+shell("wm density")+"font="+shell("settings get system font_scale"))
     }
     @Test fun phoneCultivationDarkLightAndTwoHundredPercentFontRemainOperable() {
