@@ -16,9 +16,11 @@ keystore.properties
 .DS_Store
 captures/
 verification/local/
+.impeccable/questions/
 
 # Private exports and signing material
 backups/
+*-OWNER-PRIVATE.zip
 earth-online-????-??-??.json
 *.backup.json
 *.pem

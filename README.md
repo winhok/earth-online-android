@@ -42,7 +42,7 @@ cd earth-online-android
 ./gradlew :core:test :app:lintDebug :app:lintRelease :app:assembleDebug
 ```
 
-Windows 使用 `gradlew.bat`。Gradle JDK 为 17，SDK Platform 36，Build Tools 35.0.0。首次运行需联网获取官方 Wrapper JAR 并验证固定 SHA-256，之后仍需下载 SDK / 构建依赖；不要再次运行历史 `publish-github.*` 建仓脚本。
+Windows 使用 `gradlew.bat`。Gradle JDK 为 17，SDK Platform 36，Build Tools 35.0.0。仓库包含已按固定 SHA-256 验证的官方 Wrapper JAR；首次构建仍需联网下载 Gradle、SDK / 构建依赖。不要再次运行历史 `publish-github.*` 建仓脚本。
 
 Debug 包名是 `xyz.winhok.earthonline.debug`。正式包名是 `xyz.winhok.earthonline`，versionCode 为 1。后续覆盖升级须使用同一签名密钥并递增 versionCode。维护者的密钥和口令以私有压缩包交付，**不在源码或公开 Release 中**；不能用一次性 bootstrap 再生成一个不同密钥来发布升级。后续签名工作流读取 production 签名 Secrets，这些账号级 Secrets 尚未配置。
 
