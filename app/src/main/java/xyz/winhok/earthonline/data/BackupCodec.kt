@@ -9,7 +9,8 @@ import xyz.winhok.earthonline.core.*
 object BackupCodec {
     const val MAX_BYTES = 8 * 1024 * 1024
     const val FORMAT = "earth-online-backup"
-    const val VERSION = 1
+    const val LEGACY_VERSION = 1
+    const val VERSION = 2
     private fun obj(vararg pairs: Pair<String, Any?>) = JSONObject().apply {
         pairs.forEach { (key, value) -> put(key, value ?: JSONObject.NULL) }
     }
@@ -41,8 +42,12 @@ object BackupCodec {
     private fun <T> JSONArray.mapObjects(block: (JSONObject) -> T): List<T> =
         (0 until length()).map { block(getJSONObject(it)) }
 
-    fun encode(world: World, now: Long): String {
-        BackupValidator.validate(world)
+    fun encode(world: World, now: Long): String = encode(BackupSnapshot(world), now)
+
+    fun encode(snapshot: BackupSnapshot, now: Long): String {
+        val world = snapshot.world
+        BackupSnapshotValidator.validate(snapshot)
+        BackupSnapshotBudget.requireFits(snapshot)
         val p = world.player
         val payload = obj(
             "player" to obj("name" to p.name, "server" to p.server, "zoneId" to p.zoneId,
@@ -63,6 +68,49 @@ object BackupCodec {
                 "completedDay" to c.completedDay, "revokedAt" to c.revokedAt) }),
             "events" to JSONArray(world.events.map { e -> obj("id" to e.id, "kind" to e.kind.name,
                 "text" to e.text, "createdAt" to e.createdAt, "questId" to e.questId, "xp" to e.xp) }),
+            "narrativePreference" to obj(
+                "playerId" to snapshot.narrativePreference.playerId,
+                "narrativeId" to snapshot.narrativePreference.narrativeId,
+            ),
+            "contracts" to JSONArray(snapshot.contracts.map { c -> obj(
+                "id" to c.id, "questId" to c.questId, "occurrence" to c.occurrence,
+                "zoneId" to c.zoneId, "dueDay" to c.dueDay, "originalRewardXp" to c.originalRewardXp,
+                "currentRewardXp" to c.currentRewardXp, "status" to c.status,
+                "signedAt" to c.signedAt, "closedAt" to c.closedAt,
+            ) }),
+            "contractRevisions" to JSONArray(snapshot.contractRevisions.map { r -> obj(
+                "id" to r.id, "contractId" to r.contractId, "sequence" to r.sequence,
+                "kind" to r.kind, "previousDueDay" to r.previousDueDay, "newDueDay" to r.newDueDay,
+                "previousRewardXp" to r.previousRewardXp, "newRewardXp" to r.newRewardXp,
+                "createdAt" to r.createdAt, "idempotencyKey" to r.idempotencyKey,
+            ) }),
+            "consequences" to JSONArray(snapshot.consequences.map { c -> obj(
+                "id" to c.id, "contractId" to c.contractId, "kind" to c.kind, "xp" to c.xp,
+                "effectiveDay" to c.effectiveDay, "createdAt" to c.createdAt,
+                "idempotencyKey" to c.idempotencyKey,
+            ) }),
+            "consequenceAdjustments" to JSONArray(snapshot.consequenceAdjustments.map { a -> obj(
+                "id" to a.id, "consequenceId" to a.consequenceId, "kind" to a.kind, "xp" to a.xp,
+                "reasonCategory" to a.reasonCategory, "createdAt" to a.createdAt,
+                "idempotencyKey" to a.idempotencyKey,
+            ) }),
+            "repaymentAllocations" to JSONArray(snapshot.repaymentAllocations.map { a -> obj(
+                "id" to a.id, "consequenceId" to a.consequenceId, "completionId" to a.completionId,
+                "xp" to a.xp, "createdAt" to a.createdAt, "idempotencyKey" to a.idempotencyKey,
+            ) }),
+            "clockBoundaries" to JSONArray(snapshot.clockBoundaries.map { b -> obj(
+                "id" to b.id, "zoneId" to b.zoneId, "lastSettledDay" to b.lastSettledDay,
+                "lastSettledAt" to b.lastSettledAt,
+            ) }),
+            "recoveryRoutes" to JSONArray(snapshot.recoveryRoutes.map { r -> obj(
+                "id" to r.id, "status" to r.status, "triggerKind" to r.triggerKind,
+                "targetDebtXp" to r.targetDebtXp, "openedAt" to r.openedAt,
+                "closedAt" to r.closedAt, "idempotencyKey" to r.idempotencyKey,
+            ) }),
+            "recoveryNodes" to JSONArray(snapshot.recoveryNodes.map { n -> obj(
+                "routeId" to n.routeId, "questId" to n.questId, "position" to n.position,
+                "addedAt" to n.addedAt, "completedAt" to n.completedAt,
+            ) }),
         ).toString()
         val encoded = obj("format" to FORMAT, "version" to VERSION, "exportedAt" to now,
             "sha256" to hash(payload), "payload" to payload).toString(2)
@@ -70,10 +118,14 @@ object BackupCodec {
         return encoded
     }
 
-    fun decode(text: String): World {
+    fun decode(text: String): World = decodeSnapshot(text).world
+
+    fun decodeSnapshot(text: String): BackupSnapshot {
         require(text.toByteArray(Charsets.UTF_8).size <= MAX_BYTES)
         val root = JSONObject(text)
-        require(root.strictString("format") == FORMAT && root.strictInt("version") == VERSION)
+        require(root.strictString("format") == FORMAT)
+        val version = root.strictInt("version")
+        require(version in LEGACY_VERSION..VERSION)
         require(root.strictLong("exportedAt") >= 0) { "Invalid export timestamp" }
         val raw = root.strictString("payload")
         require(MessageDigest.isEqual(hash(raw).toByteArray(Charsets.US_ASCII),
@@ -101,6 +153,59 @@ object BackupCodec {
                 e.nullString("questId"), e.strictInt("xp")) },
         )
         BackupValidator.validate(world)
-        return world
+        if (version == LEGACY_VERSION) return BackupSnapshot(world).also(BackupSnapshotValidator::validate)
+
+        val preference = data.getJSONObject("narrativePreference")
+        return BackupSnapshot(
+            world = world,
+            narrativePreference = NarrativePreferenceEntity(
+                preference.strictInt("playerId"),
+                preference.strictString("narrativeId"),
+            ),
+            contracts = data.getJSONArray("contracts").mapObjects { c -> ContractEntity(
+                c.strictString("id"), c.strictString("questId"), c.strictString("occurrence"),
+                c.strictString("zoneId"), c.strictLong("dueDay"), c.strictLong("originalRewardXp"),
+                c.strictLong("currentRewardXp"), c.strictString("status"), c.strictLong("signedAt"),
+                c.nullLong("closedAt"),
+            ) },
+            contractRevisions = data.getJSONArray("contractRevisions").mapObjects { r -> ContractRevisionEntity(
+                r.strictString("id"), r.strictString("contractId"), r.strictInt("sequence"),
+                r.strictString("kind"), r.nullLong("previousDueDay"), r.nullLong("newDueDay"),
+                r.strictLong("previousRewardXp"), r.strictLong("newRewardXp"), r.strictLong("createdAt"),
+                r.strictString("idempotencyKey"),
+            ) },
+            consequences = data.getJSONArray("consequences").mapObjects { c -> ConsequenceEventEntity(
+                c.strictString("id"), c.strictString("contractId"), c.strictString("kind"),
+                c.strictLong("xp"), c.strictLong("effectiveDay"), c.strictLong("createdAt"),
+                c.strictString("idempotencyKey"),
+            ) },
+            consequenceAdjustments = data.getJSONArray("consequenceAdjustments").mapObjects { a ->
+                ConsequenceAdjustmentEntity(
+                    a.strictString("id"), a.strictString("consequenceId"), a.strictString("kind"),
+                    a.strictLong("xp"), a.nullString("reasonCategory"), a.strictLong("createdAt"),
+                    a.strictString("idempotencyKey"),
+                )
+            },
+            repaymentAllocations = data.getJSONArray("repaymentAllocations").mapObjects { a ->
+                RepaymentAllocationEntity(
+                    a.strictString("id"), a.strictString("consequenceId"), a.strictString("completionId"),
+                    a.strictLong("xp"), a.strictLong("createdAt"), a.strictString("idempotencyKey"),
+                )
+            },
+            clockBoundaries = data.getJSONArray("clockBoundaries").mapObjects { b -> ClockBoundaryEntity(
+                b.strictString("id"), b.strictString("zoneId"), b.strictLong("lastSettledDay"),
+                b.strictLong("lastSettledAt"),
+            ) },
+            recoveryRoutes = data.getJSONArray("recoveryRoutes").mapObjects { r -> RecoveryRouteEntity(
+                r.strictString("id"), r.strictString("status"), r.strictString("triggerKind"),
+                r.strictLong("targetDebtXp"), r.strictLong("openedAt"), r.nullLong("closedAt"),
+                r.strictString("idempotencyKey"),
+            ) },
+            recoveryNodes = data.getJSONArray("recoveryNodes").mapObjects { n -> RecoveryNodeEntity(
+                n.strictString("routeId"), n.strictString("questId"), n.strictInt("position"),
+                n.strictLong("addedAt"), n.nullLong("completedAt"),
+            ) },
+        ).also(BackupSnapshotValidator::validate)
+            .also(BackupSnapshotBudget::requireFits)
     }
 }

@@ -17,6 +17,12 @@
 | quests | 任务 ID、类型、技能、强度、状态、截止/起始日、暂缓日期、关联主线 |
 | completions | 完成 ID、任务 ID、发生轮次、名称/技能/类型/奖励快照、完成日期、撤销时间 |
 | journal | 操作 ID、事件类型、内容、时间、可选任务 ID、展示用 XP 变动 |
+| narrative_preferences | 固定玩家 ID、稳定叙事体系 ID |
+| contracts / contract_revisions | 日期契约快照、状态、奖励及按序修订 |
+| consequence_events / consequence_adjustments | 代价事件及豁免/返还调整 |
+| repayment_allocations | 完成奖励到代价事件的偿还分配 |
+| clock_boundaries | 按存档时区持久化的结算边界 |
+| recovery_routes / recovery_nodes | 恢复路线状态及其真实任务节点 |
 
 唯一键是 `completions(questId, occurrence)`。一次性任务 occurrence=`once`；日常 occurrence=存档时区日期字符串。完成 ID 为 `questId:occurrence`。外键采用 RESTRICT，正常业务使用归档而不是硬删任务。
 
@@ -38,9 +44,11 @@
 
 本地离线产品不提供反作弊保证。修改设备时间、修改明文存档并重算摘要、创建任意任务都可能改变游戏记录；这不是支付账本或竞技排行榜。固定时区主要解决正常旅行和日期一致性，不是可信授时。
 
-## 存档协议 v1
+## 存档协议 v1 / v2
 
-顶层是 JSON 对象：`format`、`version=1`、`exportedAt`、`sha256`、`payload`。`payload` 是一段 UTF-8 JSON **字符串**，摘要作用于其原始 UTF-8 字节，避免不同序列化器键顺序影响一致性。具体固定 format 值以 `BackupCodec.kt` 为准。
+顶层是 JSON 对象：`format`、`version`、`exportedAt`、`sha256`、`payload`。当前导出 `version=2`；仍可读取 `version=1` 并把它升级为默认地球原生体系、无契约/债务/恢复记录的完整快照。`payload` 是一段 UTF-8 JSON **字符串**，摘要作用于其原始 UTF-8 字节，避免不同序列化器键顺序影响一致性。具体固定 format 值以 `BackupCodec.kt` 为准。
+
+v2 payload 在玩家、主线、任务、完成和日志之外，完整保存叙事偏好、契约及修订、代价及豁免/返还、偿还分配、时钟边界和恢复路线。恢复预览比较本机与导入快照；确认后按快照完整替换，只有提醒设置按安全规则关闭。未知叙事 ID 原样保存，显示层在不认识时回退到地球原生。高于当前版本的协议直接拒绝。
 
 手写 JSONObject 编解码，无反射依赖。未来版本会被拒绝，不猜测性兼容未知 schema。非法枚举、重复 ID、断裂外键、不合法奖励、越界日期或损坏摘要均拒绝。未知的附加 JSON 字段可能被忽略，不作为往返保留协议。
 

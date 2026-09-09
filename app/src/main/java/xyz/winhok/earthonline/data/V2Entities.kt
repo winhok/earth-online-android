@@ -3,6 +3,15 @@ package xyz.winhok.earthonline.data
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
+import xyz.winhok.earthonline.core.ClockBoundaryRecord
+import xyz.winhok.earthonline.core.ConsequenceAdjustmentRecord
+import xyz.winhok.earthonline.core.ConsequenceRecord
+import xyz.winhok.earthonline.core.ContractRecord
+import xyz.winhok.earthonline.core.ContractRevisionRecord
+import xyz.winhok.earthonline.core.NarrativePreferenceRecord
+import xyz.winhok.earthonline.core.RecoveryNodeRecord
+import xyz.winhok.earthonline.core.RecoveryRouteRecord
+import xyz.winhok.earthonline.core.RepaymentAllocationRecord
 
 @Entity(
     tableName = "narrative_preferences",
@@ -17,9 +26,9 @@ import androidx.room.Index
     ],
 )
 data class NarrativePreferenceEntity(
-    val playerId: Int = 1,
-    val narrativeId: String,
-)
+    override val playerId: Int = 1,
+    override val narrativeId: String,
+) : NarrativePreferenceRecord
 
 @Entity(
     tableName = "contracts",
@@ -38,17 +47,17 @@ data class NarrativePreferenceEntity(
     ],
 )
 data class ContractEntity(
-    val id: String,
-    val questId: String,
-    val occurrence: String,
-    val zoneId: String,
-    val dueDay: Long,
-    val originalRewardXp: Long,
-    val currentRewardXp: Long,
-    val status: String,
-    val signedAt: Long,
-    val closedAt: Long? = null,
-)
+    override val id: String,
+    override val questId: String,
+    override val occurrence: String,
+    override val zoneId: String,
+    override val dueDay: Long,
+    override val originalRewardXp: Long,
+    override val currentRewardXp: Long,
+    override val status: String,
+    override val signedAt: Long,
+    override val closedAt: Long? = null,
+) : ContractRecord
 
 @Entity(
     tableName = "contract_revisions",
@@ -67,17 +76,17 @@ data class ContractEntity(
     ],
 )
 data class ContractRevisionEntity(
-    val id: String,
-    val contractId: String,
-    val sequence: Int,
-    val kind: String,
-    val previousDueDay: Long?,
-    val newDueDay: Long?,
-    val previousRewardXp: Long,
-    val newRewardXp: Long,
-    val createdAt: Long,
-    val idempotencyKey: String,
-)
+    override val id: String,
+    override val contractId: String,
+    override val sequence: Int,
+    override val kind: String,
+    override val previousDueDay: Long?,
+    override val newDueDay: Long?,
+    override val previousRewardXp: Long,
+    override val newRewardXp: Long,
+    override val createdAt: Long,
+    override val idempotencyKey: String,
+) : ContractRevisionRecord
 
 @Entity(
     tableName = "consequence_events",
@@ -96,14 +105,14 @@ data class ContractRevisionEntity(
     ],
 )
 data class ConsequenceEventEntity(
-    val id: String,
-    val contractId: String,
-    val kind: String,
-    val xp: Long,
-    val effectiveDay: Long,
-    val createdAt: Long,
-    val idempotencyKey: String,
-)
+    override val id: String,
+    override val contractId: String,
+    override val kind: String,
+    override val xp: Long,
+    override val effectiveDay: Long,
+    override val createdAt: Long,
+    override val idempotencyKey: String,
+) : ConsequenceRecord
 
 @Entity(
     tableName = "consequence_adjustments",
@@ -122,14 +131,14 @@ data class ConsequenceEventEntity(
     ],
 )
 data class ConsequenceAdjustmentEntity(
-    val id: String,
-    val consequenceId: String,
-    val kind: String,
-    val xp: Long,
-    val reasonCategory: String?,
-    val createdAt: Long,
-    val idempotencyKey: String,
-)
+    override val id: String,
+    override val consequenceId: String,
+    override val kind: String,
+    override val xp: Long,
+    override val reasonCategory: String?,
+    override val createdAt: Long,
+    override val idempotencyKey: String,
+) : ConsequenceAdjustmentRecord
 
 @Entity(
     tableName = "repayment_allocations",
@@ -155,21 +164,21 @@ data class ConsequenceAdjustmentEntity(
     ],
 )
 data class RepaymentAllocationEntity(
-    val id: String,
-    val consequenceId: String,
-    val completionId: String,
-    val xp: Long,
-    val createdAt: Long,
-    val idempotencyKey: String,
-)
+    override val id: String,
+    override val consequenceId: String,
+    override val completionId: String,
+    override val xp: Long,
+    override val createdAt: Long,
+    override val idempotencyKey: String,
+) : RepaymentAllocationRecord
 
 @Entity(tableName = "clock_boundaries", primaryKeys = ["id"])
 data class ClockBoundaryEntity(
-    val id: String,
-    val zoneId: String,
-    val lastSettledDay: Long,
-    val lastSettledAt: Long,
-)
+    override val id: String,
+    override val zoneId: String,
+    override val lastSettledDay: Long,
+    override val lastSettledAt: Long,
+) : ClockBoundaryRecord
 
 @Entity(
     tableName = "recovery_routes",
@@ -177,14 +186,14 @@ data class ClockBoundaryEntity(
     indices = [Index(value = ["idempotencyKey"], unique = true)],
 )
 data class RecoveryRouteEntity(
-    val id: String,
-    val status: String,
-    val triggerKind: String,
-    val targetDebtXp: Long,
-    val openedAt: Long,
-    val closedAt: Long?,
-    val idempotencyKey: String,
-)
+    override val id: String,
+    override val status: String,
+    override val triggerKind: String,
+    override val targetDebtXp: Long,
+    override val openedAt: Long,
+    override val closedAt: Long?,
+    override val idempotencyKey: String,
+) : RecoveryRouteRecord
 
 @Entity(
     tableName = "recovery_nodes",
@@ -206,9 +215,9 @@ data class RecoveryRouteEntity(
     indices = [Index("questId")],
 )
 data class RecoveryNodeEntity(
-    val routeId: String,
-    val questId: String,
-    val position: Int,
-    val addedAt: Long,
-    val completedAt: Long?,
-)
+    override val routeId: String,
+    override val questId: String,
+    override val position: Int,
+    override val addedAt: Long,
+    override val completedAt: Long?,
+) : RecoveryNodeRecord

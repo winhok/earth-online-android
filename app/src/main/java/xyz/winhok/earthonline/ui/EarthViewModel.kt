@@ -30,7 +30,7 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
     private val working = MutableStateFlow(false)
     private val channel = Channel<UiMessage>(Channel.BUFFERED)
     val messages = channel.receiveAsFlow()
-    private val restoreDraft = MutableStateFlow<World?>(null)
+    private val restoreDraft = MutableStateFlow<PendingRestore?>(null)
     val pendingRestore = restoreDraft.asStateFlow()
     private val world = retry.flatMapLatest {
         repo.observe().map { LoadedWorld(it) }.catch { error ->
@@ -88,7 +88,7 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
     }
     fun export(uri: Uri) = change {
         withContext(Dispatchers.IO) {
-            val text = BackupCodec.encode(repo.snapshot(), System.currentTimeMillis())
+            val text = BackupCodec.encode(repo.snapshotBackup(), System.currentTimeMillis())
             val output = app.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("No output stream")
             output.use { it.write(text.toByteArray(Charsets.UTF_8)); it.flush() }
         }
@@ -111,13 +111,14 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
             }
             val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
-            BackupCodec.decode(text)
+            val snapshot = BackupCodec.decodeSnapshot(text)
+            PendingRestore(snapshot, RestorePreview.between(repo.snapshotBackup(), snapshot))
         }
     }
     fun dismissRestore() { if (!working.value) restoreDraft.value = null }
     fun confirmRestore(success: () -> Unit) = change {
         val value = restoreDraft.value ?: return@change
-        repo.restore(value)
+        repo.restore(value.snapshot)
         restoreDraft.value = null
         configureReminder(false)
         success()

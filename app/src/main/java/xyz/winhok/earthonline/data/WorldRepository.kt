@@ -25,13 +25,27 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
         quests = dao.quests().map { it.value }, completions = dao.completions().map { it.value },
         events = dao.events().map { it.value },
     )
+    suspend fun snapshotBackup(): BackupSnapshot = db.withTransaction { readBackupSnapshot() }
+    private suspend fun readBackupSnapshot() = BackupSnapshot(
+        world = readSnapshot(),
+        narrativePreference = dao.narrativePreference()
+            ?: NarrativePreferenceEntity(narrativeId = EarthDatabase.EARTH_NATIVE_NARRATIVE_ID),
+        contracts = dao.contracts(),
+        contractRevisions = dao.contractRevisions(),
+        consequences = dao.consequences(),
+        consequenceAdjustments = dao.consequenceAdjustments(),
+        repaymentAllocations = dao.repaymentAllocations(),
+        clockBoundaries = dao.clockBoundaries(),
+        recoveryRoutes = dao.recoveryRoutes(),
+        recoveryNodes = dao.recoveryNodes(),
+    )
     private suspend fun player(): Player = dao.player()?.value ?: throw RuleViolation(RuleError.PROFILE)
     private suspend fun quest(id: String): Quest = dao.quest(id)?.value ?: throw RuleViolation(RuleError.MISSING_QUEST)
     private suspend fun event(kind: EventKind, text: String, questId: String? = null, xp: Int = 0) {
         ensure(dao.eventCount() < QuestRules.MAX_EVENTS, RuleError.LIMIT)
         dao.putEvent(EventEntity(JournalEvent(id(), kind, text, clock.millis(), questId, xp)))
         // Roll back the entire action rather than create a save that can no longer be exported.
-        SnapshotBudget.requireFits(readSnapshot())
+        BackupSnapshotBudget.requireFits(readBackupSnapshot())
     }
 
     suspend fun join(name: String, server: String) = db.withTransaction {
@@ -51,7 +65,7 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
             remindersEnabled = reminders, reminderHour = hour)
         QuestRules.validatePlayer(value)
         dao.putPlayer(PlayerEntity(value = value))
-        SnapshotBudget.requireFits(readSnapshot())
+        BackupSnapshotBudget.requireFits(readBackupSnapshot())
     }
 
     suspend fun saveQuest(draft: QuestDraft): Quest = db.withTransaction {
@@ -141,24 +155,29 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
         event(EventKind.NOTE, text.trim())
     }
 
-    suspend fun restore(world: World) {
-        BackupValidator.validate(world) // No mutation until parsing, digest and all relations validate.
-        SnapshotBudget.requireFits(world)
+    suspend fun restore(world: World) = restore(BackupSnapshot(world))
+
+    suspend fun restore(snapshot: BackupSnapshot) {
+        // Parsing, digest, capacity and every relation are checked before the first mutation.
+        BackupSnapshotValidator.validate(snapshot)
+        BackupSnapshotBudget.requireFits(snapshot)
         db.withTransaction {
             clearTables()
+            val world = snapshot.world
             dao.putPlayer(PlayerEntity(value = world.player.copy(remindersEnabled = false, lastReminderDay = null)))
-            dao.putNarrativePreference(
-                NarrativePreferenceEntity(narrativeId = EarthDatabase.EARTH_NATIVE_NARRATIVE_ID),
-            )
+            dao.putNarrativePreference(snapshot.narrativePreference)
             world.goals.forEach { dao.putGoal(GoalEntity(it)) }
             world.quests.forEach { dao.putQuest(QuestEntity(it)) }
             world.completions.forEach { dao.putCompletion(CompletionEntity(it)) }
             world.events.forEach { dao.putEvent(EventEntity(it)) }
-            // Full backups at the event limit remain importable without an extra event.
-            if (world.events.size < QuestRules.MAX_EVENTS &&
-                SnapshotBudget.upperBound(world) + 4_096 <= SnapshotBudget.MAX_BYTES) {
-                event(EventKind.RESTORED, "JSON")
-            }
+            snapshot.contracts.forEach { dao.putContract(it) }
+            snapshot.contractRevisions.forEach { dao.putContractRevision(it) }
+            snapshot.consequences.forEach { dao.putConsequence(it) }
+            snapshot.consequenceAdjustments.forEach { dao.putConsequenceAdjustment(it) }
+            snapshot.repaymentAllocations.forEach { dao.putRepaymentAllocation(it) }
+            snapshot.clockBoundaries.forEach { dao.putClockBoundary(it) }
+            snapshot.recoveryRoutes.forEach { dao.putRecoveryRoute(it) }
+            snapshot.recoveryNodes.forEach { dao.putRecoveryNode(it) }
         }
     }
 

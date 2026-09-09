@@ -131,12 +131,13 @@ fun SettingsScreen(model: EarthViewModel, state: EarthUiState, onDismiss: () -> 
         }
     }
     if (discard) DiscardDialog({ discard = false }, onDismiss)
-    pending?.let { preview ->
-        AlertDialog(onDismissRequest = { model.dismissRestore() }, title = { Text("覆盖本机存档？") },
-            text = { Text("已通过格式与校验检查。\n玩家：${preview.player.name}\n任务：${preview.quests.size} 项\n日志：${preview.events.size} 条\n\n当前存档将被替换，不会自动合并。建议先取消并导出旧存档。导入后提醒默认关闭。",
-                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) },
-            confirmButton = { TextButton(onClick = { model.confirmRestore(onDismiss) }, enabled = !state.busy) { Text("确认覆盖") } },
-            dismissButton = { TextButton(onClick = { model.dismissRestore() }, enabled = !state.busy) { Text("取消") } })
+    pending?.let { value ->
+        RestorePreviewDialog(
+            preview = value.preview,
+            busy = state.busy,
+            onConfirm = { model.confirmRestore(onDismiss) },
+            onDismiss = model::dismissRestore,
+        )
     }
     if (deleteOpen) AlertDialog(onDismissRequest = { if (!state.busy) deleteOpen = false }, title = { Text("删除本机全部存档") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -149,4 +150,42 @@ fun SettingsScreen(model: EarthViewModel, state: EarthUiState, onDismiss: () -> 
     if (privacyOpen) AlertDialog(onDismissRequest = { privacyOpen = false }, title = { Text("隐私说明 · 离线 1.0") },
         text = { Text("本应用在应用沙盒的 Room 数据库中保存玩家设置、任务、主线、完成记录及手记。\n\n应用没有联网、定位、广告、埋点和远程 AI 功能。系统通知仅在你主动开启后使用；通知不显示任务标题。\n\n存档依靠设备本身的存储保护，数据库未另加应用层加密。系统自动备份已在清单中禁用；厂商行为仍需真机验证。\n\n导出会把明文数据写入你选择的位置，所选文件提供商可能是云盘。导入仅在本机解析。分享和保管导出文件由你控制。\n\n删除本机存档不会删除你之前导出的文件。", modifier = Modifier.heightIn(max = 500.dp).verticalScroll(rememberScrollState())) },
         confirmButton = { TextButton(onClick = { privacyOpen = false }) { Text("关闭") } })
+}
+
+@Composable
+fun RestorePreviewDialog(
+    preview: RestorePreview,
+    busy: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("覆盖本机存档？") },
+        text = {
+            Column(
+                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text("已通过格式、摘要、容量与关联校验。")
+                Text("玩家")
+                Text(preview.snapshot.world.player.name, style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(4.dp))
+                Text("任务变化：${preview.questChanges} 项")
+                Text("完成变化：${preview.completionChanges} 项")
+                Text("契约变化：${preview.contractChanges} 项")
+                Text("债务记录变化：${preview.debtRecordChanges} 项（${preview.currentDebtXp} XP → ${preview.importedDebtXp} XP）")
+                Text("恢复路线变化：${preview.recoveryRouteChanges} 项")
+                Text("叙事体系变化：${preview.narrativeChanges} 项")
+                Spacer(Modifier.height(6.dp))
+                Text("当前存档将被完整替换，不会自动合并，也不会保留快照外的债务或体系偏好。建议先取消并导出旧存档。导入后提醒默认关闭。")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = !busy) { Text("确认覆盖") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("取消") }
+        },
+    )
 }
