@@ -1,0 +1,28 @@
+{
+  "source_commit": "0867dd378de367a8fda57af093fcfbbd1ed45a9f",
+  "workflow_run": 34402800774,
+  "artifact_id": 10124502679,
+  "api": 35,
+  "fixture_data": "synthetic acceptance data, not user records or product defaults",
+  "files": {
+    "v15-legacy-signed.png": "65c389700fbd2c3269fac29010ebaf2d5a0dcba5e613b28fb653a8127ab71388",
+    "v15-overdue-batch.png": "336bd90bb931b1eac2364e568881f10363638a28d567c9c84d1cf69990531757",
+    "v15-phone-cultivation-200pct-action-display.txt": "0cd6cdef46188b1844a7c5da5758ff0137c8e7e55a1f733b297d9ef61366faf8",
+    "v15-phone-cultivation-200pct-action.png": "82611faaac9d938f20af1ecda53a1e6d310c8eea7dc21d455077c59577cc96c4",
+    "v15-phone-cultivation-200pct-top-display.txt": "0cd6cdef46188b1844a7c5da5758ff0137c8e7e55a1f733b297d9ef61366faf8",
+    "v15-phone-cultivation-200pct-top.png": "ea1f4299f4a479ad95ef15ced4102eebd0b19d94142658838213400bb5157b22",
+    "v15-phone-cultivation-dark-display.txt": "b68b1f3612454b8d744c3787e70316cbf445e8d55ff34ca9f15126dbb8901fb9",
+    "v15-phone-cultivation-dark.png": "b06592cf2248f642ac2580fc5f5efdfd70f1ebe7361c6336f00163eb10b90853",
+    "v15-phone-cultivation-light-display.txt": "b68b1f3612454b8d744c3787e70316cbf445e8d55ff34ca9f15126dbb8901fb9",
+    "v15-phone-cultivation-light.png": "28361600e3d116362bafcbca0b48340c456fa5a524fc2f0d6772c584f8c475f1",
+    "v15-phone-earth-light-display.txt": "b68b1f3612454b8d744c3787e70316cbf445e8d55ff34ca9f15126dbb8901fb9",
+    "v15-phone-earth-light.png": "681ec3155dd8b10d30d1ac486d918faf81053672cba6e0dbece2c2c4f3b68109",
+    "v15-recovery-closed.png": "c503e1cf0acce967a4b0345cc8ee68410a948966a3bee5988b390e96858da217",
+    "v15-tablet-cultivation-dark-display.txt": "9819dc1c9f5c5c629842e98d4d64c13c8a4159102eb02ece2a892bc5555e2433",
+    "v15-tablet-cultivation-dark.png": "55b0d9ce840eefe349a6f87585a912c72454c492739238c94ab2fadc04b9f820",
+    "v15-tablet-cultivation-light-display.txt": "9819dc1c9f5c5c629842e98d4d64c13c8a4159102eb02ece2a892bc5555e2433",
+    "v15-tablet-cultivation-light.png": "80b866b4721208bedb2cbdbb362f23ec685f62c69c065540e3148315c08e6916",
+    "v15-tablet-rotated-draft-display.txt": "70f3d1ddcfa320b8ea946bd924795e256cf254376972181847319c70d980334e",
+    "v15-tablet-rotated-draft.png": "f90ce21a7e1145d64bc92b04a7f4b0a22cb572c666a368774328001d46fdc03b"
+  }
+}
