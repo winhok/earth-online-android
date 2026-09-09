@@ -1,0 +1,147 @@
+name: Integrate and verify v1.5 contracts
+on:
+  push:
+    branches: ['release/1.5.0-completion']
+    paths: ['.github/workflows/apply-v15-core.yml']
+permissions:
+  contents: read
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.apply.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Verify and apply exact source patch
+        id: apply
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, hashlib, json, lzma, os, pathlib, subprocess
+          blobs = ['24fc72a7f158d36f13a4550f82b36ecb226584dd', '9dbd8566ee041729f75f7670debeea922c9a7a37', 'fdb7a5d32625f035c1aced3eeaa9f9e8399f9b8d', '8a7456bc4664a497de2651f56bc31ce89a0912f0', '2dc2001102ccfc11c23d17324aa941c03213a96b']
+          payload = b''
+          for sha in blobs:
+              raw = subprocess.check_output(['gh', 'api', f'repos/{os.environ["GITHUB_REPOSITORY"]}/git/blobs/{sha}'])
+              content = base64.b64decode(json.loads(raw)['content'])
+              assert hashlib.sha1(f'blob {len(content)}\0'.encode() + content).hexdigest() == sha
+              payload += content
+          assert hashlib.sha256(payload).hexdigest() == 'c798819e61ce694ec62a7bef810ac661302883055e7224107368c51da87774fa'
+          decoder = lzma.LZMADecompressor()
+          raw = decoder.decompress(payload, max_length=2_000_000)
+          assert decoder.eof and not decoder.unused_data
+          bundle = json.loads(raw)
+          paths = []
+          for entry in bundle['files']:
+              path = pathlib.PurePosixPath(entry['path'])
+              assert not path.is_absolute() and '..' not in path.parts and '.git' not in path.parts
+              assert str(path).startswith(('app/src/', 'core/src/', 'docs/', 'scripts/', 'verification/')) or str(path) in ('app/build.gradle.kts', 'README.md', 'CHANGELOG.md')
+              target = pathlib.Path(path)
+              assert not target.is_symlink()
+              actual = hashlib.sha256(target.read_bytes()).hexdigest() if target.exists() else None
+              assert actual == entry['before'], f'Concurrent change or wrong baseline: {path}'
+              paths.append(str(path))
+          patch = pathlib.Path(os.environ['RUNNER_TEMP']) / 'contracts.patch'
+          patch.write_text(bundle['patch'])
+          subprocess.run(['git', 'apply', '--check', str(patch)], check=True)
+          subprocess.run(['git', 'apply', str(patch)], check=True)
+          for entry in bundle['files']:
+              assert hashlib.sha256(pathlib.Path(entry['path']).read_bytes()).hexdigest() == entry['sha256'], entry['path']
+          subprocess.run(['git', 'add', '--', *paths], check=True)
+          changed = subprocess.check_output(['git', 'diff', '--cached', '--name-only']).decode().splitlines()
+          assert set(changed) == set(paths)
+          print('Verified source paths:', *paths, sep='\n')
+          subprocess.run(['git', '-c', 'user.name=github-actions[bot]', '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com', 'commit', '-m', 'feat(contracts): implement transactional deadline settlement, debt and recovery with backup v3'], check=True)
+          subprocess.run(['git', 'push', 'origin', 'HEAD:refs/heads/release/1.5.0-completion'], check=True)
+          sha = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'sha={sha}\n')
+          PY
+  build:
+    needs: integrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.integrate.outputs.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - run: sh scripts/bootstrap-wrapper.sh
+      - name: Domain tests, lint and both build types
+        run: |
+          set -o pipefail
+          gradle :core:test :app:lintDebug :app:lintRelease :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee /tmp/build.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v15-core-build-evidence
+          path: |
+            /tmp/build.log
+            core/build/test-results/
+            core/build/reports/
+            app/build/reports/
+            app/schemas/
+          retention-days: 14
+  instrumented:
+    needs: [integrate, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 35]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.integrate.outputs.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: bash scripts/emulator-acceptance.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v15-core-device-${{ matrix.api }}
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+            verification/device/
+          retention-days: 14
