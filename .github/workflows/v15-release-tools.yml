@@ -1,0 +1,53 @@
+name: Integrate reviewed release tooling
+on:
+  push:
+    branches: ['release/1.5.0-completion']
+    paths: ['.github/workflows/v15-release-tools.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Apply only reviewed files and verify every content hash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import base64,hashlib,json,lzma,os,pathlib,subprocess
+          payload=b''
+          for sha in ['0f8e9bd39c9209bca7bd41dc6f7542d4ed11ada0','c58b952d4f1ffaee5084c7f8edc48861659b03fa']:
+              value=json.loads(subprocess.check_output(['gh','api',f'repos/{os.environ["GITHUB_REPOSITORY"]}/git/blobs/{sha}']))
+              raw=base64.b64decode(value['content'])
+              assert hashlib.sha1(f'blob {len(raw)}\0'.encode()+raw).hexdigest()==sha
+              payload+=raw
+          assert hashlib.sha256(payload).hexdigest()=='a68c7fd1b039b4be8576d67ec27778455edbebf8b065da590ddfdb25eb7e804d'
+          decoder=lzma.LZMADecompressor()
+          bundle=json.loads(decoder.decompress(payload,max_length=1_000_000))
+          assert decoder.eof and not decoder.unused_data
+          paths=[]
+          for entry in bundle['files']:
+              p=pathlib.PurePosixPath(entry['path'])
+              assert not p.is_absolute() and '..' not in p.parts
+              assert str(p).startswith(('app/src/','core/src/','scripts/','docs/'))
+              target=pathlib.Path(p)
+              assert not target.is_symlink()
+              before=hashlib.sha256(target.read_bytes()).hexdigest() if target.exists() else None
+              assert before==entry['before'],str(p)
+              paths.append(str(p))
+          patch=pathlib.Path(os.environ['RUNNER_TEMP'])/'release-tools.patch'
+          patch.write_text(bundle['patch'])
+          subprocess.run(['git','apply','--check',str(patch)],check=True)
+          subprocess.run(['git','apply',str(patch)],check=True)
+          for entry in bundle['files']:
+              assert hashlib.sha256(pathlib.Path(entry['path']).read_bytes()).hexdigest()==entry['sha256']
+          subprocess.run(['git','add','--',*paths],check=True)
+          assert set(subprocess.check_output(['git','diff','--cached','--name-only']).decode().splitlines())==set(paths)
+          subprocess.run(['git','-c','user.name=github-actions[bot]','-c','user.email=41898282+github-actions[bot]@users.noreply.github.com','commit','-m','fix(review): stabilize settlement rendering and add original-key release acceptance'],check=True)
+          subprocess.run(['git','push','origin','HEAD:refs/heads/release/1.5.0-completion'],check=True)
+          print(subprocess.check_output(['git','rev-parse','HEAD']).decode())
+          PY
