@@ -21,11 +21,11 @@
 
 首次打开时由 Android Studio 配置 SDK；命令行可配置 `ANDROID_HOME` 或在不提交的 `local.properties` 设置 `sdk.dir`。Windows 路径须使用 Java properties 合法转义，建议让 Android Studio 自动生成。
 
-## Wrapper 首次引导
+## Gradle Wrapper
 
-源码包未包含 `gradle-wrapper.jar`，因为本次生成环境无法获取二进制；这不是可运行的假 JAR。`gradlew` / `gradlew.bat` 调用 `scripts/bootstrap-wrapper.*` 下载官方 Gradle 8.13 Wrapper JAR，**校验通过才执行**。这是一个固定版本、固定来源、带摘要校验的首次引导步骤，之后可离线复用已缓存文件和依赖。
+仓库包含官方 Gradle 8.13 `gradle-wrapper.jar`。`gradlew` / `gradlew.bat` 每次运行前都会通过 `scripts/bootstrap-wrapper.*` 校验固定 SHA-256；若 JAR 缺失，引导脚本才会从固定官方来源下载，**校验通过后才执行**。
 
-Android Studio 首次导入前若提示 Wrapper 缺失，先执行：
+若本地 JAR 缺失或需要重新获取，可执行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-wrapper.ps1
