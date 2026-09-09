@@ -43,7 +43,7 @@ internal object EarthNativeNarrative {
                 when (key) {
                     in catalogEntries -> SemanticAvailability.DIRECT_CATALOG
                     in unavailable -> SemanticAvailability.UNAVAILABLE
-                    else -> SemanticAvailability.SHARED_SURFACE
+                    else -> error("Earth Native semantic is not classified: ${key.wireId}")
                 }
             },
             inheritedSurfaces = DestinationSemantic.entries.toSet(),
@@ -75,7 +75,10 @@ internal object EarthNativeNarrative {
             ScreenSemantic.LOAD_ERROR_BODY to textEntry("请重试。应用不会为了启动而清空数据库。"),
             FieldSemantic.PLAYER_NAME to textEntry("玩家名"),
             FieldSemantic.SERVER_NAME to textEntry("服务器名（自己取一个）"),
+            FieldSemantic.THEME to textEntry("界面风格"),
+            FieldSemantic.REMINDERS to textEntry("开启每日提醒"),
             FieldSemantic.REMINDER_HOUR to textEntry("提醒小时（0–23）"),
+            FieldSemantic.DUE_DAY to textEntry("日期"),
             ActionSemantic.JOIN to textEntry("创建本地角色"),
             ActionSemantic.OPEN_SETTINGS to textEntry("设置与存档", IconRole.SETTINGS),
             ActionSemantic.CREATE_QUEST to textEntry("接取任务", IconRole.QUEST),
@@ -202,11 +205,14 @@ internal object EarthNativeNarrative {
             ScreenSemantic.QUESTS_BODY to textEntry("主线指引方向，支线负责行动。"),
             FieldSemantic.QUEST_SEARCH to textEntry("搜索任务或主线"),
             StateSemantic.LOADING to textEntry("正在读取存档"),
+            StateSemantic.LOAD_ERROR to textEntry("存档读取失败", IconRole.ERROR),
+            StateSemantic.EMPTY to textEntry("暂无内容"),
             StateSemantic.ACTIVE to textEntry("进行中"),
             StateSemantic.COMPLETED to textEntry("已完成", IconRole.COMPLETION),
             StateSemantic.PAUSED to textEntry("暂停"),
             StateSemantic.ARCHIVED to textEntry("归档"),
             StateSemantic.REVIEW_REQUIRED to textEntry("待重审", IconRole.WARNING),
+            StateSemantic.SNOOZED to textEntry("暂缓中"),
             ScreenSemantic.FILTER_GOALS to textEntry("主线"),
             ScreenSemantic.ALL_GOALS to textEntry("所有主线"),
             ScreenSemantic.NO_GOALS_TITLE to textEntry("还没有主线"),

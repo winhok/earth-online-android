@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import java.time.LocalDate
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +29,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import xyz.winhok.earthonline.BuildConfig
 import xyz.winhok.earthonline.core.*
 import xyz.winhok.earthonline.reminder.Reminders
+
+private const val DELETE_CONFIRMATION = "删除" // narrative-copy-guard: allow-domain-token
 
 @Composable
 fun SettingsScreen(model: EarthViewModel, state: EarthUiState, onDismiss: () -> Unit) {
@@ -126,7 +129,7 @@ fun SettingsScreen(model: EarthViewModel, state: EarthUiState, onDismiss: () -> 
                 Text(presenter.text(ScreenSemantic.BACKUP_SECURITY_BODY),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = { exportFile.launch("earth-online-${dateLabel(state.day)}.json") }, enabled = !state.busy) { Text(presenter.text(ActionSemantic.EXPORT_BACKUP)) }
+                    OutlinedButton(onClick = { exportFile.launch("earth-online-${LocalDate.ofEpochDay(state.day)}.json") }, enabled = !state.busy) { Text(presenter.text(ActionSemantic.EXPORT_BACKUP)) }
                     OutlinedButton(onClick = { importFile.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }, enabled = !state.busy) { Text(presenter.text(ActionSemantic.IMPORT_BACKUP)) }
                 }
             }
@@ -159,7 +162,7 @@ fun SettingsScreen(model: EarthViewModel, state: EarthUiState, onDismiss: () -> 
             OutlinedTextField(deleteText, { deleteText = it.take(8) }, label = { Text(presenter.text(ScreenSemantic.DELETE_CONFIRM_FIELD)) }, enabled = !state.busy)
         } },
         confirmButton = { TextButton(onClick = { model.reset { deleteOpen = false; onDismiss() } },
-            enabled = deleteText == "删除" && !state.busy) { Text(presenter.text(ActionSemantic.DELETE_ALL_DATA, semanticArguments {
+            enabled = deleteText == DELETE_CONFIRMATION && !state.busy) { Text(presenter.text(ActionSemantic.DELETE_ALL_DATA, semanticArguments {
                 put(SemanticParameters.DELETE_DATA_LABEL, DeleteDataLabel.CONFIRM)
             }), color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onClick = { deleteOpen = false }, enabled = !state.busy) { Text(presenter.text(ActionSemantic.CANCEL)) } })

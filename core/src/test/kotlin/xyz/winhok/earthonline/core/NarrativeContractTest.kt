@@ -3,7 +3,6 @@ package xyz.winhok.earthonline.core
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
 
 class NarrativeContractTest {
@@ -257,6 +256,83 @@ class NarrativeContractTest {
     }
 
     @Test
+    fun earthNativeHasNoImplicitSharedSemanticFallbacks() {
+        val manifest = NarrativeRegistry.builtIns().manifest(NarrativeSystemId.EARTH_NATIVE)
+
+        assertEquals(
+            emptySet<SemanticKey>(),
+            manifest.semanticCapabilities.filterValues {
+                it == SemanticAvailability.SHARED_SURFACE
+            }.keys,
+        )
+        assertEquals(
+            NarrativeSemantics.all - manifest.semanticCapabilities
+                .filterValues { it == SemanticAvailability.UNAVAILABLE }.keys,
+            manifest.catalogEntries,
+        )
+    }
+
+    @Test
+    fun earthNativeInterpretsEveryCatalogEntryWithRepresentativeParameters() {
+        val registry = NarrativeRegistry.builtIns()
+        val definition = registry.definition(NarrativeSystemId.EARTH_NATIVE)
+        val day = java.time.LocalDate.of(2026, 9, 10).toEpochDay()
+        val samples = mapOf<SemanticParameter<*>, Any>(
+            SemanticParameters.XP to XpAmount(25),
+            SemanticParameters.PLAYER_NAME to OpaqueText("玩家"),
+            SemanticParameters.SERVER_NAME to OpaqueText("现实服"),
+            SemanticParameters.TITLE to OpaqueText("标题"),
+            SemanticParameters.DESCRIPTION to OpaqueText("说明"),
+            SemanticParameters.NOTE to OpaqueText("手记"),
+            SemanticParameters.LEVEL to LevelNumber(2),
+            SemanticParameters.DAY to EpochDay(day),
+            SemanticParameters.COUNT to CountValue(2),
+            SemanticParameters.MINUTES to CountValue(25),
+            SemanticParameters.TEXT_LENGTH to CountValue(12),
+            SemanticParameters.PROGRESS to LevelProgress(20, 100, 1),
+            SemanticParameters.RECOMMENDATION_REASONS to
+                RecommendationReasons(listOf(RecommendationReason.FITS_TIME)),
+            SemanticParameters.QUEST_META to QuestMetaPresentation(
+                QuestKind.SIDE, 25, Skill.KNOWLEDGE, day, null, day,
+            ),
+            SemanticParameters.QUEST_PRIORITY_DIFFICULTY to
+                QuestPriorityDifficulty(2, Difficulty.NORMAL),
+            SemanticParameters.GOAL_PROGRESS to GoalProgress(1, 2, 3),
+            SemanticParameters.GOAL_TITLE to GoalTitlePresentation(OpaqueText("主线"), false),
+            SemanticParameters.QUEST_DETAIL to QuestDetailPresentation(25, 1),
+            SemanticParameters.COMPLETION_MOMENT to CompletionMoment(1_000L, "Asia/Shanghai"),
+            SemanticParameters.DIFFICULTY_REWARD to DifficultyReward(Difficulty.NORMAL, 25),
+            SemanticParameters.COMPLETE_QUEST_LABEL to CompleteQuestLabel(CompleteQuestLabelStyle.SHORT),
+            SemanticParameters.UNDO_COMPLETION_LABEL to UndoCompletionLabel.SHORT,
+            SemanticParameters.ARCHIVE_QUEST_LABEL to ArchiveQuestLabel.DETAIL,
+            SemanticParameters.SKILL_LEVEL to SkillLevel(Skill.KNOWLEDGE, LevelNumber(2)),
+            SemanticParameters.TOTAL_XP to TotalXpAmount(125),
+            SemanticParameters.EVENT_HEADER to EventHeader(
+                EventKind.COMPLETED,
+                CompletionMoment(1_757_325_600_000L, "Asia/Shanghai"),
+            ),
+            SemanticParameters.SIGNED_XP to SignedXpAmount(-25),
+            SemanticParameters.ZONE_ID to ZoneIdValue("Asia/Shanghai"),
+            SemanticParameters.VERSION_NAME to VersionName("2.0-test"),
+            SemanticParameters.RESTORE_SUMMARY to RestoreSummary(1, 2, 3, 4, 5, 6, 7, 8),
+            SemanticParameters.DELETE_DATA_LABEL to DeleteDataLabel.SETTINGS,
+        )
+
+        NarrativeScheme.entries.forEach { scheme ->
+            definition.manifest.catalogEntries.forEach { key ->
+                val values = definition.catalog.parameters(key).associateWith(samples::getValue)
+                val presentation = registry.interpret(
+                    NarrativeSystemId.EARTH_NATIVE,
+                    SemanticRequest(key, SemanticArguments.from(values)),
+                    NarrativeLocale.ZH_CN,
+                    scheme,
+                )
+                assertTrue("Blank presentation for ${key.wireId} in ${scheme.wireId}", presentation.text.isNotBlank())
+            }
+        }
+    }
+
+    @Test
     fun everySemanticCategoryUsesUniqueStableWireIds() {
         val expectedCategories = SemanticCategory.entries.toSet()
         val grouped = NarrativeSemantics.all.groupBy { it.category }
@@ -390,6 +466,41 @@ class NarrativeContractTest {
     }
 
     @Test
+    fun incompleteDefinitionsFailWithDimensionSpecificMessages() {
+        val registry = NarrativeRegistry.builtIns()
+        val earthNative = registry.definition(NarrativeSystemId.EARTH_NATIVE)
+        val manifest = earthNative.manifest
+        val cases = mapOf(
+            "locale" to earthNative.copy(manifest = manifest.copy(locales = emptySet())),
+            "scheme" to earthNative.copy(manifest = manifest.copy(schemes = setOf(NarrativeScheme.DARK))),
+            "capability" to earthNative.copy(manifest = manifest.copy(
+                capabilities = manifest.capabilities - NarrativeCapability.EFFECT,
+            )),
+            "semantic" to earthNative.copy(manifest = manifest.copy(
+                semanticCapabilities = manifest.semanticCapabilities - ActionSemantic.SAVE,
+            )),
+            "resource" to earthNative.copy(manifest = manifest.copy(resources = emptySet())),
+            "catalog" to earthNative.copy(manifest = manifest.copy(catalogEntries = emptySet())),
+            "color resources" to earthNative.copy(manifest = manifest.copy(
+                resources = manifest.resources.mapTo(mutableSetOf()) {
+                    if (it.kind == ResourceKind.COLOR) {
+                        it.copy(schemes = setOf(NarrativeScheme.DARK))
+                    } else {
+                        it
+                    }
+                },
+            )),
+        )
+
+        cases.forEach { (expectedMessage, definition) ->
+            val error = expectIllegalArgument {
+                NarrativeRegistry.create(NarrativeSystemId.EARTH_NATIVE, listOf(definition))
+            }
+            assertTrue(error.message.orEmpty().contains(expectedMessage, ignoreCase = true))
+        }
+    }
+
+    @Test
     fun extensibleRegistryRejectsIncompleteDefinitionsBeforeRegistration() {
         val builtIns = NarrativeRegistry.builtIns()
         val earthNative = builtIns.definition(NarrativeSystemId.EARTH_NATIVE)
@@ -412,6 +523,9 @@ class NarrativeContractTest {
                 NarrativeResource("duplicate", ResourceKind.COLOR, NarrativeScheme.entries.toSet()),
                 NarrativeResource("effect", ResourceKind.EFFECT),
             ))),
+            earthNative.copy(manifest = manifest.copy(resources = manifest.resources.mapTo(mutableSetOf()) {
+                if (it.kind == ResourceKind.COLOR) it.copy(schemes = setOf(NarrativeScheme.DARK)) else it
+            })),
             earthNative.copy(manifest = manifest.copy(catalogEntries = emptySet())),
             earthNative.copy(manifest = manifest.copy(
                 semanticCapabilities = manifest.semanticCapabilities - ActionSemantic.SAVE,
@@ -615,12 +729,12 @@ class NarrativeContractTest {
         override val completedAt: Long? = 5,
     ) : RecoveryNodeRecord
 
-    private fun expectIllegalArgument(block: () -> Unit) {
+    private fun expectIllegalArgument(block: () -> Unit): IllegalArgumentException {
         try {
             block()
-            fail("Expected IllegalArgumentException")
-        } catch (_: IllegalArgumentException) {
-            // Expected rejection at the public contract boundary.
+        } catch (error: IllegalArgumentException) {
+            return error
         }
+        throw AssertionError("Expected IllegalArgumentException")
     }
 }

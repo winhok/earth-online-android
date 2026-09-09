@@ -94,3 +94,38 @@ dependencies {
     androidTestImplementation(libs.espresso)
     androidTestImplementation(libs.room.testing)
 }
+
+val verifyNarrativeCopy by tasks.registering {
+    val guardedSources = files(
+        fileTree("src/main/java/xyz/winhok/earthonline") { include("**/*.kt") },
+    )
+    inputs.files(guardedSources)
+
+    doLast {
+        val stringLiteralWithHan = Regex("\"(?:\\\\.|[^\"\\\\])*[\\u3400-\\u9fff](?:\\\\.|[^\"\\\\])*\"")
+        val rawStringWithHan = Regex("\"\"\"[\\s\\S]*?[\\u3400-\\u9fff][\\s\\S]*?\"\"\"")
+        val violations = guardedSources.files.sortedBy { it.path }.flatMap { source ->
+            val text = source.readText()
+            val lineViolations = text.lineSequence().mapIndexedNotNull { index, line ->
+                if (
+                    "narrative-copy-guard: allow-domain-token" !in line &&
+                    stringLiteralWithHan.containsMatchIn(line)
+                ) {
+                    "${source.relativeTo(projectDir)}:${index + 1}"
+                } else {
+                    null
+                }
+            }
+            val rawViolations = rawStringWithHan.findAll(text).map { match ->
+                val line = text.take(match.range.first).count { it == '\n' } + 1
+                "${source.relativeTo(projectDir)}:$line"
+            }
+            (lineViolations + rawViolations).distinct()
+        }
+        check(violations.isEmpty()) {
+            "App-owned Han-script copy must use the narrative catalog; violations: ${violations.joinToString()}"
+        }
+    }
+}
+
+tasks.named("preBuild").configure { dependsOn(verifyNarrativeCopy) }

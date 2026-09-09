@@ -237,6 +237,9 @@ class SemanticArguments private constructor(
 
     companion object {
         val EMPTY = SemanticArguments(emptyMap())
+
+        internal fun from(values: Map<SemanticParameter<*>, Any>): SemanticArguments =
+            SemanticArguments(values.toMap())
     }
 
     class Builder {
@@ -296,6 +299,9 @@ class NarrativeCatalog(entries: Map<SemanticKey, NarrativeSemanticEntry>) {
     private val entries = entries.toMap()
     val keys: Set<SemanticKey> get() = entries.keys
 
+    internal fun parameters(key: SemanticKey): Set<SemanticParameter<*>> =
+        entries[key]?.parameters ?: throw IllegalArgumentException("Missing semantic: ${key.wireId}")
+
     fun interpret(request: SemanticRequest): NarrativePresentation {
         val entry = entries[request.key] ?: throw IllegalArgumentException("Missing semantic: ${request.key.wireId}")
         require(request.arguments.values.keys == entry.parameters) {
@@ -354,12 +360,22 @@ class NarrativeRegistry private constructor(
     fun validate(systemId: NarrativeSystemId) {
         val system = systems[systemId] ?: throw IllegalArgumentException("Unknown narrative: ${systemId.wireId}")
         val manifest = system.manifest
-        require(manifest.structureVersion > 0 && manifest.contentVersion > 0)
-        require(manifest.locales.isNotEmpty())
-        require(manifest.schemes == NarrativeScheme.entries.toSet())
-        require(manifest.capabilities.keys == NarrativeCapability.entries.toSet())
-        require(manifest.semanticCapabilities.keys == NarrativeSemantics.all)
-        require(manifest.catalogEntries == system.catalog.keys)
+        require(manifest.structureVersion > 0 && manifest.contentVersion > 0) {
+            "Narrative versions must be positive"
+        }
+        require(manifest.locales.isNotEmpty()) { "Narrative locale declaration is empty" }
+        require(manifest.schemes == NarrativeScheme.entries.toSet()) {
+            "Narrative scheme declaration must cover light and dark"
+        }
+        require(manifest.capabilities.keys == NarrativeCapability.entries.toSet()) {
+            "Narrative capability declaration is incomplete"
+        }
+        require(manifest.semanticCapabilities.keys == NarrativeSemantics.all) {
+            "Narrative semantic declaration is incomplete"
+        }
+        require(manifest.catalogEntries == system.catalog.keys) {
+            "Narrative catalog declaration does not match catalog entries"
+        }
         require(
             manifest.semanticCapabilities.filterValues { it == SemanticAvailability.DIRECT_CATALOG }.keys ==
                 manifest.catalogEntries,
@@ -371,12 +387,15 @@ class NarrativeRegistry private constructor(
         require(manifest.inheritedCatalogEntries.intersect(manifest.catalogEntries).isEmpty())
         if (manifest.id == defaultSystemId) {
             require(manifest.inheritedCatalogEntries.isEmpty())
+            require(manifest.semanticCapabilities.values.none { it == SemanticAvailability.SHARED_SURFACE }) {
+                "Default narrative cannot rely on shared semantic fallbacks"
+            }
         } else {
             require(manifest.inheritedCatalogEntries.all {
                 it in systems.getValue(defaultSystemId).manifest.catalogEntries
             })
         }
-        require(manifest.resources.isNotEmpty())
+        require(manifest.resources.isNotEmpty()) { "Narrative resource declaration is empty" }
         require(manifest.resources.map { it.id }.distinct().size == manifest.resources.size)
         require(manifest.resources.all { resource ->
             resource.id.length in 1..120 &&
@@ -385,7 +404,11 @@ class NarrativeRegistry private constructor(
         })
         require(manifest.resources.map { it.kind }.toSet().containsAll(
             setOf(ResourceKind.BRAND, ResourceKind.COLOR, ResourceKind.EFFECT),
-        ))
+        )) { "Narrative resources must include brand, color, and effect declarations" }
+        require(
+            manifest.resources.filter { it.kind == ResourceKind.COLOR }
+                .flatMapTo(mutableSetOf()) { it.schemes } == manifest.schemes,
+        ) { "Narrative color resources must cover every declared scheme" }
         val hasDirectCatalog = manifest.catalogEntries.isNotEmpty()
         val hasInheritedCatalog = manifest.inheritedCatalogEntries.isNotEmpty()
         listOf(
