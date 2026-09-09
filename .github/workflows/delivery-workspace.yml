@@ -1,0 +1,25 @@
+name: Delivery workspace snapshot
+on:
+  push:
+    branches: ['release/1.5.0-completion']
+    paths: ['.github/workflows/delivery-workspace.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive exact tracked source
+        run: |
+          mkdir -p /tmp/earth-delivery
+          git archive --format=zip HEAD -o /tmp/earth-delivery/source.zip
+          git rev-parse HEAD > /tmp/earth-delivery/source-commit.txt
+          git ls-tree -r HEAD > /tmp/earth-delivery/source-tree.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v15-source-baseline
+          path: /tmp/earth-delivery/
+          retention-days: 7
+          if-no-files-found: error
