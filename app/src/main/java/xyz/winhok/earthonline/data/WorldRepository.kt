@@ -7,13 +7,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import xyz.winhok.earthonline.core.*
 
-data class CompletionResult(val completion: Completion, val changed: Boolean)
+data class CompletionResult(val completion: Completion, val changed: Boolean, val repaidXp: Long = 0)
 
 /** Room is the single source of truth, including preferences and the reward ledger. */
 class WorldRepository(private val db: EarthDatabase, private val clock: Clock = Clock.systemUTC()) {
     private val dao = db.dao()
     private fun id(): String = UUID.randomUUID().toString()
     private fun ensure(ok: Boolean, error: RuleError) { if (!ok) throw RuleViolation(error) }
+
+    fun observeSnapshot(): Flow<BackupSnapshot> = db.invalidationTracker.createFlow(
+        "player", "quests", "goals", "completions", "journal", "contracts", "contract_revisions",
+        "consequence_events", "consequence_adjustments", "repayment_allocations", "clock_boundaries",
+        "recovery_routes", "recovery_nodes", "progress_history", "narrative_preferences",
+        "effect_preferences", "presentation_preferences", emitInitialState = true,
+    ).map { reconciledSnapshot() }
 
     fun observe(): Flow<World> = db.invalidationTracker.createFlow(
         "player", "quests", "goals", "completions", "journal", emitInitialState = true,
@@ -46,6 +53,9 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
         clockBoundaries = dao.clockBoundaries(),
         recoveryRoutes = dao.recoveryRoutes(),
         recoveryNodes = dao.recoveryNodes(),
+        progressHistory = dao.progressHistory() ?: ProgressHistoryEntity(),
+        effects = dao.effects() ?: EffectPreferencesEntity(),
+        presentationPreferences = dao.presentationPreferences(),
     )
     private suspend fun player(): Player = dao.player()?.value ?: throw RuleViolation(RuleError.PROFILE)
     private suspend fun quest(id: String): Quest = dao.quest(id)?.value ?: throw RuleViolation(RuleError.MISSING_QUEST)
@@ -69,6 +79,7 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
     }
 
     suspend fun updatePlayer(name: String, server: String, theme: ThemeMode, reminders: Boolean, hour: Int) = db.withTransaction {
+        reconcileInside()
         val value = player().copy(name = name.trim(), server = server.trim(), theme = theme,
             remindersEnabled = reminders, reminderHour = hour)
         QuestRules.validatePlayer(value)
@@ -82,70 +93,89 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
         BackupSnapshotBudget.requireFits(readBackupSnapshot())
     }
 
-    suspend fun saveQuest(draft: QuestDraft): Quest = db.withTransaction {
+    /** All financial writes happen under the same Room transaction as quest and audit writes. */
+    suspend fun plan(command: DeadlineCommand): PlannedCommand = db.withTransaction {
+        reconcileInside()
+        PlannedCommand(command, DeadlineEngine.preview(readBackupSnapshot().deadlineState(), command, clock.millis()))
+    }
+
+    suspend fun execute(command: DeadlineCommand, accepted: ContractDisclosure? = null): DeadlineOutcome = db.withTransaction {
         player()
-        val old = draft.id?.let { quest(it) }
-        if (old == null) ensure(dao.questCount() < QuestRules.MAX_QUESTS, RuleError.LIMIT)
-        // Snapshot the public nullable property from :core before checking it.
-        val goalId = draft.goalId
-        if (goalId != null) {
-            val goal = dao.goal(goalId)?.value
-            ensure(goal != null && (!goal.archived || old?.goalId == goal.id), RuleError.MISSING_GOAL)
-        }
-        val value = QuestRules.edit(old, draft, id(), maxOf(clock.millis(), old?.createdAt ?: 0),
-            old != null && dao.hasHistory(old.id))
-        dao.putQuest(QuestEntity(value))
-        event(if (old == null) EventKind.CREATED else EventKind.EDITED, value.title, value.id)
-        value
+        val before = readBackupSnapshot()
+        val outcome = DeadlineEngine.execute(before.deadlineState(), command, clock.millis(), accepted, ::id)
+        persistDeadline(before, before.withDeadline(outcome.state))
+        outcome
     }
 
-    suspend fun complete(questId: String): CompletionResult = db.withTransaction {
-        val value = quest(questId)
-        val now = clock.millis()
-        val day = World(player = player()).dayAt(now)
-        val key = QuestRules.completionId(value, day)
-        val previous = dao.completion(key)?.value
-        val completed = QuestRules.complete(value, previous, now, day)
-        if (previous?.revokedAt == null && previous != null) return@withTransaction CompletionResult(previous, false)
-        if (previous == null) ensure(dao.completionCount() < QuestRules.MAX_COMPLETIONS, RuleError.LIMIT)
-        dao.putCompletion(CompletionEntity(completed))
-        event(EventKind.COMPLETED, completed.title, value.id, completed.xp)
-        CompletionResult(completed, true)
+    suspend fun reconciledSnapshot(): BackupSnapshot = db.withTransaction { reconcileInside(); readBackupSnapshot() }
+    suspend fun reconcile() = db.withTransaction { reconcileInside(); Unit }
+    private suspend fun reconcileInside() {
+        val before = readBackupSnapshot()
+        if (!before.world.player.onboarded) return
+        val after = before.withDeadline(DeadlineEngine.reconcile(before.deadlineState(), clock.millis(), ::id))
+        if (after != before) persistDeadline(before, after)
     }
 
-    /** Uses the exact occurrence ID, so a snackbar after midnight cannot undo another day. */
-    suspend fun undo(completionId: String): Boolean = db.withTransaction {
-        val old = dao.completion(completionId)?.value ?: return@withTransaction false
-        if (old.revokedAt != null) return@withTransaction false
-        dao.putCompletion(CompletionEntity(old.copy(revokedAt = clock.millis())))
-        event(EventKind.UNDONE, old.title, old.questId, -old.xp)
-        true
+    private suspend fun persistDeadline(before: BackupSnapshot, after: BackupSnapshot) {
+        BackupSnapshotBudget.requireFits(after)
+        BackupSnapshotValidator.validate(after)
+        val quests=before.world.quests.associateBy { it.id }
+        after.world.quests.filter { quests[it.id]!=it }.forEach { dao.putQuest(QuestEntity(it)) }
+        val completions=before.world.completions.associateBy { it.id }
+        after.world.completions.filter { completions[it.id]!=it }.forEach { dao.putCompletion(CompletionEntity(it)) }
+        val contracts=before.contracts.associateBy { it.id }
+        // Close previous promises before activating a replacement protected by a unique index.
+        after.contracts.filter { contracts[it.id]!=it }.sortedBy { if(it.status=="ACTIVE") 1 else 0 }.forEach { dao.putContract(it) }
+        val revisions=before.contractRevisions.map { it.id }.toSet()
+        after.contractRevisions.filterNot { it.id in revisions }.forEach { dao.putContractRevision(it) }
+        val consequences=before.consequences.map { it.id }.toSet()
+        after.consequences.filterNot { it.id in consequences }.forEach { dao.putConsequence(it) }
+        val adjustments=before.consequenceAdjustments.map { it.id }.toSet()
+        after.consequenceAdjustments.filterNot { it.id in adjustments }.forEach { dao.putConsequenceAdjustment(it) }
+        val allocations=before.repaymentAllocations.map { it.id }.toSet()
+        after.repaymentAllocations.filterNot { it.id in allocations }.forEach { dao.putRepaymentAllocation(it) }
+        if(before.clockBoundaries!=after.clockBoundaries) { dao.clearClockBoundaries(); after.clockBoundaries.forEach { dao.putClockBoundary(it) } }
+        val routes=before.recoveryRoutes.associateBy { it.id }
+        after.recoveryRoutes.filter { routes[it.id]!=it }.forEach { dao.putRecoveryRoute(it) }
+        if(before.recoveryNodes!=after.recoveryNodes) { dao.clearRecoveryNodes(); after.recoveryNodes.forEach { dao.putRecoveryNode(it) } }
+        if(before.progressHistory!=after.progressHistory) dao.putProgressHistory(after.progressHistory)
+        val events=before.world.events.map { it.id }.toSet()
+        after.world.events.filterNot { it.id in events }.forEach { dao.putEvent(EventEntity(it)) }
     }
 
-    suspend fun postpone(questId: String) = db.withTransaction {
-        val old = quest(questId)
-        ensure(old.state == QuestState.ACTIVE, RuleError.INACTIVE)
-        val day = World(player = player()).dayAt(clock.millis())
-        ensure(dao.completion(QuestRules.completionId(old, day))?.value?.revokedAt != null ||
-            dao.completion(QuestRules.completionId(old, day)) == null, RuleError.NOT_AVAILABLE)
-        val until = maxOf(day, old.snoozedUntilDay ?: day, if (old.kind == QuestKind.DAILY) old.dueDay ?: day else day) + 1
-        ensure(until <= QuestRules.MAX_DAY && old.postponeCount < 1_000_000, RuleError.LIMIT)
-        dao.putQuest(QuestEntity(old.copy(snoozedUntilDay = until, postponeCount = old.postponeCount + 1,
-            updatedAt = maxOf(clock.millis(), old.createdAt))))
-        event(EventKind.POSTPONED, old.title, old.id)
+    suspend fun saveQuest(draft: QuestDraft, accepted: ContractDisclosure? = null): Quest {
+        val newId=accepted?.questId ?: id()
+        val result=execute(DeadlineCommand.Save(draft,newId),accepted)
+        return result.state.world.quests.first { it.id==(draft.id ?: newId) }
     }
+    suspend fun complete(questId: String): CompletionResult {
+        val result=execute(DeadlineCommand.Complete(questId))
+        return CompletionResult(requireNotNull(result.completion),result.changed,result.repaidXp)
+    }
+    suspend fun undo(completionId: String, accepted: ContractDisclosure? = null): Boolean {
+        val before = snapshot().completions.firstOrNull { it.id==completionId && it.revokedAt==null }
+        execute(DeadlineCommand.Undo(completionId),accepted)
+        return before!=null
+    }
+    suspend fun postpone(questId: String, accepted: ContractDisclosure? = null) { execute(DeadlineCommand.Postpone(questId),accepted) }
+    suspend fun setQuestState(questId: String, state: QuestState, accepted: ContractDisclosure? = null) { execute(DeadlineCommand.SetState(questId,state),accepted) }
 
-    suspend fun setQuestState(questId: String, state: QuestState) = db.withTransaction {
-        val old = quest(questId)
-        val value = old.copy(state = state, updatedAt = maxOf(clock.millis(), old.createdAt),
-            postponeCount = if (state == QuestState.ACTIVE) 0 else old.postponeCount,
-            snoozedUntilDay = if (state == QuestState.ACTIVE) null else old.snoozedUntilDay)
-        dao.putQuest(QuestEntity(value))
-        event(when (state) { QuestState.ACTIVE -> EventKind.RESUMED; QuestState.PAUSED -> EventKind.PAUSED;
-            QuestState.ARCHIVED -> EventKind.ARCHIVED }, old.title, old.id)
+    suspend fun saveEffects(sound: Boolean, haptics: Boolean, reducedMotion: Boolean) = db.withTransaction {
+        player()
+        dao.putEffects(EffectPreferencesEntity(sound=sound,haptics=haptics,reducedMotion=reducedMotion))
+    }
+    suspend fun setPresentationPreference(narrativeId: String, key: String, enabled: Boolean) = db.withTransaction {
+        player()
+        ensure(key in setOf("intro_seen","story_collapsed") && narrativeId.matches(Regex("[A-Za-z0-9_.:-]{1,120}")),RuleError.INVALID_BACKUP)
+        val before=readBackupSnapshot()
+        val preference=PresentationPreferenceEntity(narrativeId,key,enabled)
+        val after=before.copy(presentationPreferences=before.presentationPreferences.filterNot { it.narrativeId==narrativeId && it.preferenceKey==key }+preference)
+        BackupSnapshotValidator.validate(after); BackupSnapshotBudget.requireFits(after)
+        dao.putPresentationPreference(preference)
     }
 
     suspend fun saveGoal(goalId: String?, title: String, description: String) = db.withTransaction {
+        reconcileInside()
         player()
         ensure(title.trim().length in 1..120, RuleError.TITLE)
         ensure(description.length <= 4_000, RuleError.DESCRIPTION)
@@ -158,12 +188,14 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
     }
 
     suspend fun archiveGoal(goalId: String) = db.withTransaction {
+        reconcileInside()
         val old = dao.goal(goalId)?.value ?: throw RuleViolation(RuleError.MISSING_GOAL)
         dao.putGoal(GoalEntity(old.copy(archived = true)))
         event(EventKind.GOAL_ARCHIVED, old.title)
     }
 
     suspend fun addNote(text: String) = db.withTransaction {
+        reconcileInside()
         player()
         ensure(text.trim().length in 1..4_000, RuleError.DESCRIPTION)
         event(EventKind.NOTE, text.trim())
@@ -192,11 +224,17 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
             snapshot.clockBoundaries.forEach { dao.putClockBoundary(it) }
             snapshot.recoveryRoutes.forEach { dao.putRecoveryRoute(it) }
             snapshot.recoveryNodes.forEach { dao.putRecoveryNode(it) }
+            dao.putProgressHistory(snapshot.progressHistory)
+            dao.putEffects(snapshot.effects)
+            snapshot.presentationPreferences.forEach { dao.putPresentationPreference(it) }
         }
     }
 
     suspend fun reset() = db.withTransaction { clearTables() }
     private suspend fun clearTables() {
+        dao.clearPresentationPreferences()
+        dao.clearEffects()
+        dao.clearProgressHistory()
         dao.clearRecoveryNodes()
         dao.clearRecoveryRoutes()
         dao.clearRepaymentAllocations()

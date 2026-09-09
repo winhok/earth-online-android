@@ -326,6 +326,7 @@ object NarrativeSemantics {
         addAll(NotificationSemantic.entries)
         addAll(AchievementSemantic.entries)
         addAll(EventSemantic.entries)
+        addAll(ContractSemantic.entries)
     }
 }
 

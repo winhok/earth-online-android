@@ -326,7 +326,7 @@ class MigrationV1ToV2Test {
     }
 
     private fun openDatabase() = Room.databaseBuilder(context, EarthDatabase::class.java, databaseName)
-        .addMigrations(EarthDatabase.MIGRATION_1_2)
+        .addMigrations(EarthDatabase.MIGRATION_1_2, EarthDatabase.MIGRATION_2_3)
         .build()
 
     private fun insertQuest(

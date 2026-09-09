@@ -7,25 +7,7 @@ import java.time.format.DateTimeFormatter
 internal object EarthNativeNarrative {
     val catalogEntries: Set<SemanticKey> get() = catalog().keys
 
-    val unavailable = setOf<SemanticKey>(
-        ActionSemantic.RESCHEDULE_CONTRACT,
-        ActionSemantic.ABANDON_CONTRACT,
-        ActionSemantic.RECOMMIT_CONTRACT,
-        ActionSemantic.SETTLE_OVERDUE,
-        ActionSemantic.VIEW_DEBT,
-        ActionSemantic.OPEN_RECOVERY,
-        ActionSemantic.SELECT_RECOVERY_NODE,
-        ActionSemantic.APPLY_FORCE_MAJEURE,
-        StateSemantic.CONTRACT_ACTIVE,
-        StateSemantic.CONTRACT_FULFILLED,
-        StateSemantic.CONTRACT_OVERDUE,
-        StateSemantic.CONTRACT_ABANDONED,
-        StateSemantic.CONTRACT_EXEMPTED,
-        StateSemantic.DEBT,
-        StateSemantic.OUT_OF_ORDER,
-        StateSemantic.RECOVERY_OPEN,
-        StateSemantic.RECOVERY_CLOSED,
-    )
+    val unavailable = emptySet<SemanticKey>()
 
     fun definition() = NarrativeSystemDefinition(
         manifest = NarrativeManifest(
@@ -67,7 +49,7 @@ internal object EarthNativeNarrative {
             ScreenSemantic.JOIN_TAGLINE to textEntry("现实没有重开键，\n但随时可以接取下一项任务。"),
             ScreenSemantic.JOIN_PRIVACY_NOTICE to textEntry(
                 "无需账号 · 无广告 · 无云端上传\n任务保存在本机。卸载前请导出存档；备份文件为明文。\n" +
-                    "这里不因拖延扣血，也不评价你的现实价值。",
+                    "未签契约不追罚；签约代价先明示。不评价你的现实价值。",
             ),
             ScreenSemantic.DEFAULT_SERVER_NAME to textEntry("现实服"),
             ScreenSemantic.LOAD_ERROR_TITLE to textEntry("无法读取存档"),
@@ -91,7 +73,7 @@ internal object EarthNativeNarrative {
             ActionSemantic.VIEW_ALL to textEntry("全部"),
             ActionSemantic.VIEW_GOAL_QUESTS to textEntry("所属任务"),
             ActionSemantic.EDIT_QUEST to textEntry("编辑任务"),
-            ActionSemantic.POSTPONE_QUEST to textEntry("暂缓一天（不修改截止日）"),
+            ActionSemantic.POSTPONE_QUEST to textEntry("暂缓 / 延期一天（先查看规则）"),
             ActionSemantic.PAUSE_QUEST to textEntry("暂停这项任务"),
             ActionSemantic.RESUME_QUEST to textEntry("重新接取 / 清除暂缓"),
             ActionSemantic.ARCHIVE_QUEST to NarrativeSemanticEntry(
@@ -572,7 +554,7 @@ internal object EarthNativeNarrative {
                     text = arguments.require(SemanticParameters.NOTE).value,
                 ) },
             ),
-        ),
+        ) + DeadlineNarrative.entries(false),
     )
 
     private fun contentEntry() = NarrativeSemanticEntry(

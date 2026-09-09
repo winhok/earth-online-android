@@ -6,7 +6,7 @@ import java.time.LocalDate
 object BackupValidator {
     private fun validId(id: String) = id.length in 1..80 && id.all { it.isLetterOrDigit() || it in "-_:" }
     private fun unique(ids: List<String>) = ids.size == ids.toSet().size
-    fun validate(world: World) {
+    fun validate(world: World, contractRewards: Map<String, Set<Int>> = emptyMap()) {
         SnapshotBudget.requireFits(world)
         QuestRules.validatePlayer(world.player)
         requireRule(world.player.onboarded, RuleError.INVALID_BACKUP)
@@ -32,7 +32,7 @@ object BackupValidator {
         world.completions.forEach {
             val quest = quests[it.questId] ?: throw RuleViolation(RuleError.INVALID_BACKUP)
             requireRule(it.kind == quest.kind && it.id == "${it.questId}:${it.occurrence}" &&
-                it.xp in if (it.kind == QuestKind.BOSS) setOf(35, 50, 75) else setOf(10, 25, 50),
+                (it.xp in (if (it.kind == QuestKind.BOSS) setOf(35, 50, 75) else setOf(10, 25, 50)) || it.xp in contractRewards[it.questId].orEmpty()),
                 RuleError.INVALID_BACKUP)
             requireRule(it.title.length in 1..120 && it.completedAt >= 0 &&
                 (it.revokedAt == null || it.revokedAt >= 0) &&

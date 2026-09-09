@@ -28,7 +28,7 @@ internal object CultivationNarrative {
                 )
             },
         ),
-        ActionSemantic.POSTPONE_QUEST to textEntry("暂缓一日（不改天命）"),
+        ActionSemantic.POSTPONE_QUEST to textEntry("暂缓 / 改命一日（先看规则）"),
         ActionSemantic.PAUSE_QUEST to textEntry("暂歇此项历练"),
         ActionSemantic.RESUME_QUEST to textEntry("重新接取 / 清除暂缓"),
         ScreenSemantic.DASHBOARD_DAY_MODE to NarrativeSemanticEntry(
@@ -40,7 +40,7 @@ internal object CultivationNarrative {
         ScreenSemantic.DASHBOARD_LEVEL to NarrativeSemanticEntry(
             parameters = setOf(SemanticParameters.LEVEL),
             render = { arguments -> NarrativePresentation(
-                "Lv.${arguments.require(SemanticParameters.LEVEL).value} · 修行者",
+                "${RealmTitles.at(arguments.require(SemanticParameters.LEVEL).value)} · Lv.${arguments.require(SemanticParameters.LEVEL).value}",
             ) },
         ),
         ScreenSemantic.DASHBOARD_PROGRESS to NarrativeSemanticEntry(
@@ -134,7 +134,7 @@ internal object CultivationNarrative {
                 "还有 ${arguments.require(SemanticParameters.COUNT).value} 项可行历练。择一件小事，继续前进。",
             ) },
         ),
-    )
+    ) + DeadlineNarrative.entries(true)
 
     private val inheritedEntries = EarthNativeNarrative.catalogEntries - directEntries.keys
 

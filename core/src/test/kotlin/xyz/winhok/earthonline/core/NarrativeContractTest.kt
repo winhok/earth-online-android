@@ -306,7 +306,7 @@ class NarrativeContractTest {
             manifest.semanticCapabilities.getValue(ActionSemantic.COMPLETE_QUEST),
         )
         assertEquals(
-            SemanticAvailability.UNAVAILABLE,
+            SemanticAvailability.DIRECT_CATALOG,
             manifest.semanticCapabilities.getValue(StateSemantic.CONTRACT_OVERDUE),
         )
         assertEquals(
@@ -342,6 +342,12 @@ class NarrativeContractTest {
         val registry = NarrativeRegistry.builtIns()
         val day = java.time.LocalDate.of(2026, 9, 10).toEpochDay()
         val samples = mapOf<SemanticParameter<*>, Any>(
+            ContractParameters.DISCLOSURE to ContractDisclosure(setOf(DisclosureKind.SIGN),"q","User title",reward=25,overdueCost=25,dueDay=day,zoneId="UTC"),
+            ContractParameters.CARD to ContractCardData("ACTIVE",day,"UTC",25,20,1,false),
+            ContractParameters.SUMMARY to EffectiveProgress(ProgressRules.fromXp(20),100,0,2),
+            ContractParameters.SELECTION to RecoverySelectionData(100,75,4),
+            ContractParameters.SETTLEMENT to SettlementData(25,20,2,1),
+            ContractParameters.LEDGER to LedgerLine("l","OVERDUE","User title",25,1000,"c","UTC"),
             SemanticParameters.XP to XpAmount(25),
             SemanticParameters.PLAYER_NAME to OpaqueText("玩家"),
             SemanticParameters.SERVER_NAME to OpaqueText("现实服"),

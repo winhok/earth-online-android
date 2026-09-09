@@ -10,7 +10,7 @@ object BackupCodec {
     const val MAX_BYTES = 8 * 1024 * 1024
     const val FORMAT = "earth-online-backup"
     const val LEGACY_VERSION = 1
-    const val VERSION = 2
+    const val VERSION = 3
     private fun obj(vararg pairs: Pair<String, Any?>) = JSONObject().apply {
         pairs.forEach { (key, value) -> put(key, value ?: JSONObject.NULL) }
     }
@@ -77,6 +77,9 @@ object BackupCodec {
                 "zoneId" to c.zoneId, "dueDay" to c.dueDay, "originalRewardXp" to c.originalRewardXp,
                 "currentRewardXp" to c.currentRewardXp, "status" to c.status,
                 "signedAt" to c.signedAt, "closedAt" to c.closedAt,
+                "signedKind" to c.signedKind.name, "signedSkill" to c.signedSkill.name,
+                "extensionCount" to c.extensionCount, "fulfilledAt" to c.fulfilledAt,
+                "activeQuestId" to c.activeQuestId,
             ) }),
             "contractRevisions" to JSONArray(snapshot.contractRevisions.map { r -> obj(
                 "id" to r.id, "contractId" to r.contractId, "sequence" to r.sequence,
@@ -96,7 +99,7 @@ object BackupCodec {
             ) }),
             "repaymentAllocations" to JSONArray(snapshot.repaymentAllocations.map { a -> obj(
                 "id" to a.id, "consequenceId" to a.consequenceId, "completionId" to a.completionId,
-                "xp" to a.xp, "createdAt" to a.createdAt, "idempotencyKey" to a.idempotencyKey,
+                "xp" to a.xp, "createdAt" to a.createdAt, "idempotencyKey" to a.idempotencyKey, "reversalOf" to a.reversalOf,
             ) }),
             "clockBoundaries" to JSONArray(snapshot.clockBoundaries.map { b -> obj(
                 "id" to b.id, "zoneId" to b.zoneId, "lastSettledDay" to b.lastSettledDay,
@@ -105,8 +108,11 @@ object BackupCodec {
             "recoveryRoutes" to JSONArray(snapshot.recoveryRoutes.map { r -> obj(
                 "id" to r.id, "status" to r.status, "triggerKind" to r.triggerKind,
                 "targetDebtXp" to r.targetDebtXp, "openedAt" to r.openedAt,
-                "closedAt" to r.closedAt, "idempotencyKey" to r.idempotencyKey,
+                "closedAt" to r.closedAt, "idempotencyKey" to r.idempotencyKey, "closedThroughAssessmentCount" to r.closedThroughAssessmentCount,
             ) }),
+            "progressHistory" to obj("id" to snapshot.progressHistory.id, "highestLevel" to snapshot.progressHistory.highestLevel),
+            "effects" to obj("id" to snapshot.effects.id, "sound" to snapshot.effects.sound, "haptics" to snapshot.effects.haptics, "reducedMotion" to snapshot.effects.reducedMotion),
+            "presentationPreferences" to JSONArray(snapshot.presentationPreferences.map { obj("narrativeId" to it.narrativeId, "preferenceKey" to it.preferenceKey, "enabled" to it.enabled) }),
             "recoveryNodes" to JSONArray(snapshot.recoveryNodes.map { n -> obj(
                 "routeId" to n.routeId, "questId" to n.questId, "position" to n.position,
                 "addedAt" to n.addedAt, "completedAt" to n.completedAt,
@@ -152,7 +158,7 @@ object BackupCodec {
                 EventKind.valueOf(e.strictString("kind")), e.strictString("text"), e.strictLong("createdAt"),
                 e.nullString("questId"), e.strictInt("xp")) },
         )
-        BackupValidator.validate(world)
+        if (version <= 2) BackupValidator.validate(world)
         if (version == LEGACY_VERSION) return BackupSnapshot(world).also(BackupSnapshotValidator::validate)
 
         val preference = data.getJSONObject("narrativePreference")
@@ -167,6 +173,11 @@ object BackupCodec {
                 c.strictString("zoneId"), c.strictLong("dueDay"), c.strictLong("originalRewardXp"),
                 c.strictLong("currentRewardXp"), c.strictString("status"), c.strictLong("signedAt"),
                 c.nullLong("closedAt"),
+                if(version>=3) QuestKind.valueOf(c.strictString("signedKind")) else world.quests.first { it.id==c.strictString("questId") }.kind,
+                if(version>=3) Skill.valueOf(c.strictString("signedSkill")) else world.quests.first { it.id==c.strictString("questId") }.skill,
+                if(version>=3) c.strictInt("extensionCount") else ContractMath.inferExtensions(c.strictLong("originalRewardXp"),c.strictLong("currentRewardXp")),
+                if(version>=3) c.nullLong("fulfilledAt") else if(c.strictString("status")=="FULFILLED") c.nullLong("closedAt") else null,
+                if(version>=3) c.nullString("activeQuestId") else if(c.strictString("status")=="ACTIVE") c.strictString("questId") else null,
             ) },
             contractRevisions = data.getJSONArray("contractRevisions").mapObjects { r -> ContractRevisionEntity(
                 r.strictString("id"), r.strictString("contractId"), r.strictInt("sequence"),
@@ -189,7 +200,7 @@ object BackupCodec {
             repaymentAllocations = data.getJSONArray("repaymentAllocations").mapObjects { a ->
                 RepaymentAllocationEntity(
                     a.strictString("id"), a.strictString("consequenceId"), a.strictString("completionId"),
-                    a.strictLong("xp"), a.strictLong("createdAt"), a.strictString("idempotencyKey"),
+                    a.strictLong("xp"), a.strictLong("createdAt"), a.strictString("idempotencyKey"), if(version>=3) a.nullString("reversalOf") else null,
                 )
             },
             clockBoundaries = data.getJSONArray("clockBoundaries").mapObjects { b -> ClockBoundaryEntity(
@@ -199,8 +210,11 @@ object BackupCodec {
             recoveryRoutes = data.getJSONArray("recoveryRoutes").mapObjects { r -> RecoveryRouteEntity(
                 r.strictString("id"), r.strictString("status"), r.strictString("triggerKind"),
                 r.strictLong("targetDebtXp"), r.strictLong("openedAt"), r.nullLong("closedAt"),
-                r.strictString("idempotencyKey"),
+                r.strictString("idempotencyKey"), if(version>=3) r.strictInt("closedThroughAssessmentCount") else 0,
             ) },
+            progressHistory = if(version>=3) data.getJSONObject("progressHistory").let { ProgressHistoryEntity(it.strictInt("id"),it.strictInt("highestLevel")) } else ProgressHistoryEntity(),
+            effects = if(version>=3) data.getJSONObject("effects").let { EffectPreferencesEntity(it.strictInt("id"),it.strictBoolean("sound"),it.strictBoolean("haptics"),it.strictBoolean("reducedMotion")) } else EffectPreferencesEntity(),
+            presentationPreferences = if(version>=3) data.getJSONArray("presentationPreferences").mapObjects { PresentationPreferenceEntity(it.strictString("narrativeId"),it.strictString("preferenceKey"),it.strictBoolean("enabled")) } else emptyList(),
             recoveryNodes = data.getJSONArray("recoveryNodes").mapObjects { n -> RecoveryNodeEntity(
                 n.strictString("routeId"), n.strictString("questId"), n.strictInt("position"),
                 n.strictLong("addedAt"), n.nullLong("completedAt"),

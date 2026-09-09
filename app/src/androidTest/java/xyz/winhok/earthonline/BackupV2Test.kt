@@ -20,7 +20,7 @@ class BackupV2Test {
         val encoded = BackupCodec.encode(snapshot, now = 2_000)
         val decoded = BackupCodec.decodeSnapshot(encoded)
 
-        assertEquals(2, BackupCodec.VERSION)
+        assertEquals(3, BackupCodec.VERSION)
         assertEquals(snapshot, decoded)
         assertEquals("任务 中文 😀 \\ \"", decoded.world.quests.single().title)
         assertEquals(listOf("contract-1"), decoded.contracts.map { it.id })
