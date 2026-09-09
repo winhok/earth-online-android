@@ -37,6 +37,18 @@ class DatabaseTest {
         assertEquals(25L, ProgressRules.total(world.completions).xp)
         assertEquals(1, world.events.count { it.kind == EventKind.COMPLETED })
     }
+    @Test fun systemEventPersistsNeutralKindAndStructuredFactsWithoutRenderedSentence() = runBlocking {
+        val title = "玩家原始标题 😀"
+        val quest = repo.saveQuest(QuestDraft(title = title))
+        repo.complete(quest.id)
+
+        val event = repo.snapshot().events.single { it.kind == EventKind.COMPLETED }
+        assertEquals(EventKind.COMPLETED, event.kind)
+        assertEquals(quest.id, event.questId)
+        assertEquals(25, event.xp)
+        assertEquals(title, event.text)
+        assertNotEquals("任务完成 · +25 XP", event.text)
+    }
     @Test fun undoAndEditedRedoDoesNotFarmXp() = runBlocking {
         val q = repo.saveQuest(QuestDraft(title = "单次任务", difficulty = Difficulty.EASY))
         val first = repo.complete(q.id)

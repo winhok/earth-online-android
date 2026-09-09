@@ -23,6 +23,12 @@ import xyz.winhok.earthonline.data.NarrativePreferenceEntity
 import xyz.winhok.earthonline.data.RecoveryRouteEntity
 import xyz.winhok.earthonline.ui.RestorePreview
 import xyz.winhok.earthonline.ui.RestorePreviewDialog
+import xyz.winhok.earthonline.ui.NarrativeHost
+import xyz.winhok.earthonline.ui.RegistryNarrativePresenter
+import xyz.winhok.earthonline.core.NarrativeLocale
+import xyz.winhok.earthonline.core.NarrativeRegistry
+import xyz.winhok.earthonline.core.NarrativeScheme
+import xyz.winhok.earthonline.core.NarrativeSystemId
 
 @RunWith(AndroidJUnit4::class)
 class RestorePreviewDialogTest {
@@ -91,12 +97,19 @@ class RestorePreviewDialogTest {
 
         compose.setContent {
             MaterialTheme {
-                RestorePreviewDialog(
-                    preview = preview,
-                    busy = false,
-                    onConfirm = { confirms++ },
-                    onDismiss = { dismisses++ },
-                )
+                NarrativeHost(RegistryNarrativePresenter(
+                    NarrativeRegistry.builtIns(),
+                    NarrativeSystemId.EARTH_NATIVE,
+                    NarrativeLocale.ZH_CN,
+                    NarrativeScheme.DARK,
+                )) {
+                    RestorePreviewDialog(
+                        preview = preview,
+                        busy = false,
+                        onConfirm = { confirms++ },
+                        onDismiss = { dismisses++ },
+                    )
+                }
             }
         }
 

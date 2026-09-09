@@ -11,43 +11,71 @@ import xyz.winhok.earthonline.core.*
 
 @Composable
 fun CharacterScreen(state: EarthUiState) {
+    val presenter = LocalNarrativePresenter.current
     val world = state.world
     val progress = ProgressRules.total(world.completions)
     val done = world.completions.count { it.revokedAt == null }
     val badges = ProgressRules.achievements(world)
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        item { SectionTitle("角色档案", "成长来自行动，而不是清单的长度。") }
+        item { SectionTitle(
+            presenter.text(ScreenSemantic.CHARACTER_TITLE),
+            presenter.text(ScreenSemantic.CHARACTER_BODY),
+        ) }
         item {
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PlanetMark()
                     Text(world.player.name, style = MaterialTheme.typography.headlineLarge)
-                    Text("${world.player.server} · Lv.${progress.level}", style = MaterialTheme.typography.titleMedium)
+                    Text(presenter.text(ScreenSemantic.PROFILE_IDENTITY, semanticArguments {
+                        put(SemanticParameters.SERVER_NAME, OpaqueText(world.player.server))
+                        put(SemanticParameters.LEVEL, LevelNumber(progress.level))
+                    }), style = MaterialTheme.typography.titleMedium)
                     LinearProgressIndicator(progress = { progress.fraction }, modifier = Modifier.fillMaxWidth())
-                    Text("${progress.intoLevel} / ${progress.needed} XP", style = MaterialTheme.typography.labelMedium)
+                    Text(presenter.text(ScreenSemantic.PROFILE_PROGRESS, semanticArguments {
+                        put(SemanticParameters.PROGRESS, LevelProgress(progress.intoLevel, progress.needed, 0))
+                    }), style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
         item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SmallStat(progress.xp.toString(), "累计经验", Modifier.weight(1f))
-            SmallStat(done.toString(), "完成次数", Modifier.weight(1f))
+            SmallStat(progress.xp.toString(), presenter.text(ScreenSemantic.TOTAL_XP), Modifier.weight(1f))
+            SmallStat(done.toString(), presenter.text(ScreenSemantic.COMPLETION_COUNT), Modifier.weight(1f))
         } }
-        item { SmallStat("${ProgressRules.streak(world.completions, state.day)} 天", "当前连续行动 · 休息不会扣经验", Modifier.fillMaxWidth()) }
-        item { SectionTitle("技能成长", "这些是游戏内行动记录，不是现实能力评分。") }
+        item { SmallStat(
+            presenter.text(ScreenSemantic.CURRENT_STREAK, semanticArguments {
+                put(SemanticParameters.COUNT, CountValue(ProgressRules.streak(world.completions, state.day)))
+            }),
+            presenter.text(ScreenSemantic.STREAK_BODY),
+            Modifier.fillMaxWidth(),
+        ) }
+        item { SectionTitle(
+            presenter.text(ScreenSemantic.SKILLS_TITLE),
+            presenter.text(ScreenSemantic.SKILLS_BODY),
+        ) }
         items(Skill.entries) { skill ->
             val p = ProgressRules.total(world.completions, skill)
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("${skill.label()} · Lv.${p.level}", style = MaterialTheme.typography.titleMedium)
+                    Text(presenter.text(ScreenSemantic.SKILL_LEVEL, semanticArguments {
+                        put(SemanticParameters.SKILL_LEVEL, SkillLevel(skill, LevelNumber(p.level)))
+                    }), style = MaterialTheme.typography.titleMedium)
                     LinearProgressIndicator(progress = { p.fraction }, modifier = Modifier.fillMaxWidth())
-                    Text("${p.xp} XP", style = MaterialTheme.typography.labelSmall)
+                    Text(presenter.text(ScreenSemantic.SKILL_XP, semanticArguments {
+                        put(SemanticParameters.TOTAL_XP, TotalXpAmount(p.xp))
+                    }), style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
-        item { SectionTitle("成就档案", "成就按有效完成记录计算；撤销完成会同步重新计算。") }
-        items(achievementIds) { id ->
+        item { SectionTitle(
+            presenter.text(ScreenSemantic.ACHIEVEMENTS_TITLE),
+            presenter.text(ScreenSemantic.ACHIEVEMENTS_BODY),
+        ) }
+        items(AchievementSemantic.entries) { achievementSemantic ->
+            val id = achievementSemantic.sourceId
+            val achievement = presenter.text(achievementSemantic)
             OutlinedCard(Modifier.fillMaxWidth()) {
-                Text((if (id in badges) "已解锁   " else "未解锁   ") + achievementLabel(id),
+                Text(presenter.text(if (id in badges) StateSemantic.UNLOCKED else StateSemantic.LOCKED) +
+                    "   " + achievement,
                     modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium,
                     color = if (id in badges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
             }

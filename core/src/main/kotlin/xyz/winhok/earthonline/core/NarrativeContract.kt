@@ -48,6 +48,8 @@ data class NarrativeResource(
 )
 
 enum class NotificationSemantic(override val wireId: String) : SemanticKey {
+    REMINDER_CHANNEL("notification.reminder-channel"),
+    REMINDER_TITLE("notification.reminder-title"),
     QUEST_COMPLETED("notification.quest-completed"),
     COMPLETION_UNDONE("notification.completion-undone"),
     QUEST_POSTPONED("notification.quest-postponed"),
@@ -58,6 +60,7 @@ enum class NotificationSemantic(override val wireId: String) : SemanticKey {
     BACKUP_RESTORED("notification.backup-restored"),
     FILE_IO_FAILED("notification.file-io-failed"),
     OPERATION_FAILED("notification.operation-failed"),
+    OPEN_SETTINGS_FAILED("notification.open-settings-failed"),
 
     ;
 
@@ -90,6 +93,14 @@ object SemanticParameters {
     val COMPLETE_QUEST_LABEL = SemanticParameter<CompleteQuestLabel>("complete-quest-label")
     val UNDO_COMPLETION_LABEL = SemanticParameter<UndoCompletionLabel>("undo-completion-label")
     val ARCHIVE_QUEST_LABEL = SemanticParameter<ArchiveQuestLabel>("archive-quest-label")
+    val SKILL_LEVEL = SemanticParameter<SkillLevel>("skill-level")
+    val TOTAL_XP = SemanticParameter<TotalXpAmount>("total-xp")
+    val EVENT_HEADER = SemanticParameter<EventHeader>("event-header")
+    val SIGNED_XP = SemanticParameter<SignedXpAmount>("signed-xp")
+    val ZONE_ID = SemanticParameter<ZoneIdValue>("zone-id")
+    val VERSION_NAME = SemanticParameter<VersionName>("version-name")
+    val RESTORE_SUMMARY = SemanticParameter<RestoreSummary>("restore-summary")
+    val DELETE_DATA_LABEL = SemanticParameter<DeleteDataLabel>("delete-data-label")
 }
 
 /** Player-authored text is inserted verbatim and never sent through narrative translation. */
@@ -168,6 +179,54 @@ enum class ArchiveQuestLabel { DETAIL, CONFIRM }
 data class CompletionMoment(val epochMillis: Long, val zoneId: String) {
     init { java.time.ZoneId.of(zoneId) }
 }
+
+data class SkillLevel(val skill: Skill, val level: LevelNumber)
+
+@JvmInline
+value class TotalXpAmount(val value: Long) {
+    init { require(value >= 0) }
+}
+
+data class EventHeader(val kind: EventKind, val moment: CompletionMoment)
+
+@JvmInline
+value class SignedXpAmount(val value: Int)
+
+@JvmInline
+value class ZoneIdValue(val value: String) {
+    init { java.time.ZoneId.of(value) }
+}
+
+@JvmInline
+value class VersionName(val value: String) {
+    init { require(value.isNotBlank()) }
+}
+
+data class RestoreSummary(
+    val questChanges: Int,
+    val completionChanges: Int,
+    val contractChanges: Int,
+    val debtRecordChanges: Int,
+    val currentDebtXp: Long,
+    val importedDebtXp: Long,
+    val recoveryRouteChanges: Int,
+    val narrativeChanges: Int,
+) {
+    init {
+        require(
+            listOf(
+                questChanges,
+                completionChanges,
+                contractChanges,
+                debtRecordChanges,
+                recoveryRouteChanges,
+                narrativeChanges,
+            ).all { it >= 0 },
+        )
+    }
+}
+
+enum class DeleteDataLabel { SETTINGS, CONFIRM }
 
 class SemanticArguments private constructor(
     internal val values: Map<SemanticParameter<*>, Any>,

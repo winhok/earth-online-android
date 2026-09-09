@@ -75,6 +75,7 @@ internal object EarthNativeNarrative {
             ScreenSemantic.LOAD_ERROR_BODY to textEntry("请重试。应用不会为了启动而清空数据库。"),
             FieldSemantic.PLAYER_NAME to textEntry("玩家名"),
             FieldSemantic.SERVER_NAME to textEntry("服务器名（自己取一个）"),
+            FieldSemantic.REMINDER_HOUR to textEntry("提醒小时（0–23）"),
             ActionSemantic.JOIN to textEntry("创建本地角色"),
             ActionSemantic.OPEN_SETTINGS to textEntry("设置与存档", IconRole.SETTINGS),
             ActionSemantic.CREATE_QUEST to textEntry("接取任务", IconRole.QUEST),
@@ -107,6 +108,20 @@ internal object EarthNativeNarrative {
             ActionSemantic.CONFIRM to textEntry("确定"),
             ActionSemantic.CONTINUE_EDITING to textEntry("继续编辑"),
             ActionSemantic.CLOSE to textEntry("关闭"),
+            ActionSemantic.OPEN_PRIVACY to textEntry("隐私说明"),
+            ActionSemantic.EXPORT_BACKUP to textEntry("导出存档"),
+            ActionSemantic.IMPORT_BACKUP to textEntry("导入存档"),
+            ActionSemantic.CONFIRM_RESTORE to textEntry("确认覆盖"),
+            ActionSemantic.DELETE_ALL_DATA to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.DELETE_DATA_LABEL),
+                render = { arguments -> NarrativePresentation(
+                    when (arguments.require(SemanticParameters.DELETE_DATA_LABEL)) {
+                        DeleteDataLabel.SETTINGS -> "删除本机全部存档"
+                        DeleteDataLabel.CONFIRM -> "永久删除"
+                    },
+                ) },
+            ),
+            ActionSemantic.OPEN_NOTIFICATION_SETTINGS to textEntry("打开系统通知设置"),
             ActionSemantic.COMPLETE_QUEST to NarrativeSemanticEntry(
                 parameters = setOf(SemanticParameters.COMPLETE_QUEST_LABEL),
                 render = { arguments -> arguments.require(SemanticParameters.COMPLETE_QUEST_LABEL).let { label ->
@@ -324,6 +339,185 @@ internal object EarthNativeNarrative {
             FieldSemantic.GOAL_TITLE to textEntry("主线名称"),
             FieldSemantic.GOAL_DESCRIPTION to textEntry("完成标准 / 为什么重要"),
             FieldSemantic.NOTE to textEntry("今天发生了什么？"),
+            ScreenSemantic.CHARACTER_TITLE to textEntry("角色档案"),
+            ScreenSemantic.CHARACTER_BODY to textEntry("成长来自行动，而不是清单的长度。"),
+            ScreenSemantic.PROFILE_PROGRESS to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.PROGRESS),
+                render = { arguments -> arguments.require(SemanticParameters.PROGRESS).let { progress ->
+                    NarrativePresentation("${progress.intoLevel} / ${progress.needed} XP")
+                } },
+            ),
+            ScreenSemantic.TOTAL_XP to textEntry("累计经验"),
+            ScreenSemantic.COMPLETION_COUNT to textEntry("完成次数"),
+            ScreenSemantic.CURRENT_STREAK to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.COUNT),
+                render = { arguments -> NarrativePresentation(
+                    "${arguments.require(SemanticParameters.COUNT).value} 天",
+                ) },
+            ),
+            ScreenSemantic.STREAK_BODY to textEntry("当前连续行动 · 休息不会扣经验"),
+            ScreenSemantic.SKILLS_TITLE to textEntry("技能成长"),
+            ScreenSemantic.SKILLS_BODY to textEntry("这些是游戏内行动记录，不是现实能力评分。"),
+            ScreenSemantic.SKILL_LEVEL to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.SKILL_LEVEL),
+                render = { arguments -> arguments.require(SemanticParameters.SKILL_LEVEL).let { value ->
+                    NarrativePresentation("${skillLabel(value.skill)} · Lv.${value.level.value}")
+                } },
+            ),
+            ScreenSemantic.SKILL_XP to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.TOTAL_XP),
+                render = { arguments -> NarrativePresentation(
+                    "${arguments.require(SemanticParameters.TOTAL_XP).value} XP",
+                ) },
+            ),
+            ScreenSemantic.ACHIEVEMENTS_TITLE to textEntry("成就档案"),
+            ScreenSemantic.ACHIEVEMENTS_BODY to textEntry("成就按有效完成记录计算；撤销完成会同步重新计算。"),
+            ScreenSemantic.JOURNAL_TITLE to textEntry("冒险日志"),
+            ScreenSemantic.JOURNAL_BODY to textEntry("发生过的行动，都有迹可循。"),
+            ScreenSemantic.ALL_EVENTS to textEntry("全部事件"),
+            ScreenSemantic.JOURNAL_NOTES to textEntry("冒险手记"),
+            ScreenSemantic.JOURNAL_EMPTY_TITLE to textEntry("写下第一篇手记"),
+            ScreenSemantic.JOURNAL_EMPTY_BODY to textEntry("今天发现了什么、被什么卡住，都值得记录。"),
+            ScreenSemantic.EVENT_HEADER to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.EVENT_HEADER),
+                render = { arguments -> arguments.require(SemanticParameters.EVENT_HEADER).let { header ->
+                    NarrativePresentation(
+                        eventLabel(header.kind) + " · " + Instant.ofEpochMilli(header.moment.epochMillis)
+                            .atZone(java.time.ZoneId.of(header.moment.zoneId))
+                            .format(DateTimeFormatter.ofPattern("MM-dd HH:mm")),
+                    )
+                } },
+            ),
+            ScreenSemantic.JOURNAL_XP to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.SIGNED_XP),
+                render = { arguments -> arguments.require(SemanticParameters.SIGNED_XP).let { xp ->
+                    NarrativePresentation("${if (xp.value > 0) "+" else ""}${xp.value} XP")
+                } },
+            ),
+            ScreenSemantic.PLAYER_SETTINGS_TITLE to textEntry("玩家设置"),
+            ScreenSemantic.INTERFACE_STYLE to textEntry("界面风格"),
+            ScreenSemantic.THEME_SYSTEM to textEntry("跟随系统"),
+            ScreenSemantic.THEME_LIGHT to textEntry("明亮"),
+            ScreenSemantic.THEME_DARK to textEntry("深色"),
+            ScreenSemantic.REMINDERS_TITLE to textEntry("冒险提醒"),
+            ScreenSemantic.REMINDERS_BODY to textEntry("每日约定时间之后提醒，系统省电可能导致延迟。"),
+            ScreenSemantic.ENABLE_DAILY_REMINDER to textEntry("开启每日提醒"),
+            ScreenSemantic.NOTIFICATIONS_DISABLED to textEntry("当前系统通知未开启。"),
+            ScreenSemantic.TIMEZONE_INFO to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.ZONE_ID),
+                render = { arguments -> NarrativePresentation(
+                    "存档结算时区：${arguments.require(SemanticParameters.ZONE_ID).value}\n" +
+                        "日常按此时区的自然日刷新，旅行或修改设备时区不会切换结算时区。1.0 不提供时区迁移。",
+                ) },
+            ),
+            ScreenSemantic.BACKUP_TITLE to textEntry("本地存档"),
+            ScreenSemantic.BACKUP_BODY to textEntry("导出的是已保存的数据；导入会先校验，再请求覆盖确认。"),
+            ScreenSemantic.BACKUP_SECURITY_BODY to textEntry(
+                "备份为明文 JSON，包含任务和手记。请勿公开分享；文件上限 8 MiB。" +
+                    "卸载或清除应用数据会删除本机存档。",
+            ),
+            ScreenSemantic.ABOUT_TITLE to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.VERSION_NAME),
+                render = { arguments -> NarrativePresentation(
+                    "地球 Online ${arguments.require(SemanticParameters.VERSION_NAME).value}",
+                ) },
+            ),
+            ScreenSemantic.ABOUT_BODY to textEntry(
+                "离线单人版 · Kotlin + Jetpack Compose\n不接入广告、分析 SDK、账号或 AI 云服务。",
+            ),
+            ScreenSemantic.PRIVACY_TITLE to textEntry("隐私说明 · 离线 1.0"),
+            ScreenSemantic.PRIVACY_BODY to textEntry(
+                "本应用在应用沙盒的 Room 数据库中保存玩家设置、任务、主线、完成记录及手记。\n\n" +
+                    "应用没有联网、定位、广告、埋点和远程 AI 功能。系统通知仅在你主动开启后使用；通知不显示任务标题。\n\n" +
+                    "存档依靠设备本身的存储保护，数据库未另加应用层加密。系统自动备份已在清单中禁用；厂商行为仍需真机验证。\n\n" +
+                    "导出会把明文数据写入你选择的位置，所选文件提供商可能是云盘。导入仅在本机解析。分享和保管导出文件由你控制。\n\n" +
+                    "删除本机存档不会删除你之前导出的文件。",
+            ),
+            ScreenSemantic.DELETE_DATA_TITLE to textEntry("删除本机全部存档"),
+            ScreenSemantic.DELETE_DATA_BODY to textEntry(
+                "任务、主线、经验和日志都会删除。无法在应用内撤回。请先导出存档，再输入“删除”确认。",
+            ),
+            ScreenSemantic.DELETE_CONFIRM_FIELD to textEntry("输入：删除"),
+            ScreenSemantic.RESTORE_TITLE to textEntry("覆盖本机存档？"),
+            ScreenSemantic.RESTORE_VALIDATED to textEntry("已通过格式、摘要、容量与关联校验。"),
+            ScreenSemantic.RESTORE_PLAYER to textEntry("玩家"),
+            ScreenSemantic.RESTORE_SUMMARY to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.RESTORE_SUMMARY),
+                render = { arguments -> arguments.require(SemanticParameters.RESTORE_SUMMARY).let { summary ->
+                    NarrativePresentation(
+                        "任务变化：${summary.questChanges} 项\n" +
+                            "完成变化：${summary.completionChanges} 项\n" +
+                            "契约变化：${summary.contractChanges} 项\n" +
+                            "债务记录变化：${summary.debtRecordChanges} 项" +
+                            "（${summary.currentDebtXp} XP → ${summary.importedDebtXp} XP）\n" +
+                            "恢复路线变化：${summary.recoveryRouteChanges} 项\n" +
+                            "叙事体系变化：${summary.narrativeChanges} 项",
+                    )
+                } },
+            ),
+            ScreenSemantic.RESTORE_WARNING to textEntry(
+                "当前存档将被完整替换，不会自动合并，也不会保留快照外的债务或体系偏好。" +
+                    "建议先取消并导出旧存档。导入后提醒默认关闭。",
+            ),
+            ErrorSemantic.TITLE to textEntry("标题需为 1–120 个字符。"),
+            ErrorSemantic.DESCRIPTION to textEntry("内容不能为空，且不能超过 4000 个字符。"),
+            ErrorSemantic.MINUTES to textEntry("预计时长需为 1–480 分钟。"),
+            ErrorSemantic.PRIORITY to textEntry("优先级需为 1–3。"),
+            ErrorSemantic.DATE to textEntry("日期超出支持范围，请使用 1900–2200 年的日期。"),
+            ErrorSemantic.PROFILE to textEntry("请检查玩家名、服务器名称和提醒时间。"),
+            ErrorSemantic.MISSING_QUEST to textEntry("任务已不存在，请刷新后重试。"),
+            ErrorSemantic.INACTIVE to textEntry("请先重新接取这个任务。"),
+            ErrorSemantic.NOT_AVAILABLE to textEntry("任务尚未开始、正在暂缓或已经完成。"),
+            ErrorSemantic.REPEAT_LOCKED to textEntry("已有完成记录，不能更改任务类型。请归档后创建新任务。"),
+            ErrorSemantic.MISSING_GOAL to textEntry("主线不存在或已归档，请重新选择。"),
+            ErrorSemantic.LIMIT to textEntry("存档已达安全容量上限，本次修改未保存。请导出备份后开启新存档。"),
+            ErrorSemantic.INVALID_BACKUP to textEntry("存档校验失败，原有数据没有被修改。"),
+            NotificationSemantic.REMINDER_CHANNEL to textEntry("每日冒险提醒"),
+            NotificationSemantic.REMINDER_TITLE to textEntry("冒险仍在继续"),
+            NotificationSemantic.COMPLETION_UNDONE to textEntry("已撤销，经验也已恢复至完成前。"),
+            NotificationSemantic.QUEST_POSTPONED to textEntry("已暂缓一天。原截止日期保留，不扣经验。"),
+            NotificationSemantic.REMINDER_AVAILABLE to NarrativeSemanticEntry(
+                parameters = setOf(SemanticParameters.COUNT),
+                render = { arguments -> NarrativePresentation(
+                    "还有 ${arguments.require(SemanticParameters.COUNT).value} 项可执行任务。选一件小事，继续前进。",
+                ) },
+            ),
+            NotificationSemantic.REMINDER_CONFIG_FAILED to textEntry(
+                "存档已保存，但提醒调度失败。请重新打开应用后检查提醒设置。",
+            ),
+            NotificationSemantic.NOTIFICATION_PERMISSION_DENIED to textEntry(
+                "通知权限未开启，任务功能不受影响。可在系统设置中手动开启。",
+            ),
+            NotificationSemantic.BACKUP_EXPORTED to textEntry("存档已导出。此文件为明文，请妥善保存。"),
+            NotificationSemantic.BACKUP_RESTORED to textEntry("存档已恢复，提醒已关闭。需要时请重新开启。"),
+            NotificationSemantic.FILE_IO_FAILED to textEntry("文件读写失败。请检查存储空间和文件访问权限。"),
+            NotificationSemantic.OPERATION_FAILED to textEntry(
+                "操作遇到错误，请检查当前状态后重试。导入文件必须完整且版本兼容。",
+            ),
+            NotificationSemantic.OPEN_SETTINGS_FAILED to textEntry("无法打开系统设置，请手动进入应用通知设置。"),
+            StateSemantic.UNLOCKED to textEntry("已解锁"),
+            StateSemantic.LOCKED to textEntry("未解锁"),
+            AchievementSemantic.FIRST_STEP to textEntry("第一步 · 完成 1 项任务"),
+            AchievementSemantic.TEN_QUESTS to textEntry("初露锋芒 · 完成 10 项"),
+            AchievementSemantic.HUNDRED_QUESTS to textEntry("冒险家 · 完成 100 项"),
+            AchievementSemantic.THREE_DAYS to textEntry("渐入佳境 · 连续 3 天"),
+            AchievementSemantic.SEVEN_DAYS to textEntry("稳定前行 · 连续 7 天"),
+            AchievementSemantic.BOSS_CLEAR to textEntry("突破时刻 · 完成 Boss"),
+            AchievementSemantic.ALL_ROUNDER to textEntry("全面探索 · 涉及 5 种技能"),
+            EventSemantic.JOINED to textEntry("玩家上线"),
+            EventSemantic.CREATED to textEntry("接取任务"),
+            EventSemantic.EDITED to textEntry("调整任务"),
+            EventSemantic.COMPLETED to textEntry("任务完成"),
+            EventSemantic.UNDONE to textEntry("撤销完成"),
+            EventSemantic.POSTPONED to textEntry("暂缓任务"),
+            EventSemantic.PAUSED to textEntry("暂停任务"),
+            EventSemantic.RESUMED to textEntry("重新接取"),
+            EventSemantic.ARCHIVED to textEntry("归档任务"),
+            EventSemantic.GOAL_CREATED to textEntry("开启主线"),
+            EventSemantic.GOAL_EDITED to textEntry("调整主线"),
+            EventSemantic.GOAL_ARCHIVED to textEntry("主线归档"),
+            EventSemantic.NOTE to textEntry("冒险手记"),
+            EventSemantic.RESTORED to textEntry("恢复存档"),
             NotificationSemantic.QUEST_COMPLETED to NarrativeSemanticEntry(
                 parameters = setOf(SemanticParameters.XP),
                 render = { arguments ->
@@ -415,5 +609,22 @@ internal object EarthNativeNarrative {
         RecommendationReason.GOAL -> "推进主线"
         RecommendationReason.FITS_TIME -> "时间足够"
         RecommendationReason.FITS_ENERGY -> "精力匹配"
+    }
+
+    private fun eventLabel(kind: EventKind) = when (kind) {
+        EventKind.JOINED -> "玩家上线"
+        EventKind.CREATED -> "接取任务"
+        EventKind.EDITED -> "调整任务"
+        EventKind.COMPLETED -> "任务完成"
+        EventKind.UNDONE -> "撤销完成"
+        EventKind.POSTPONED -> "暂缓任务"
+        EventKind.PAUSED -> "暂停任务"
+        EventKind.RESUMED -> "重新接取"
+        EventKind.ARCHIVED -> "归档任务"
+        EventKind.GOAL_CREATED -> "开启主线"
+        EventKind.GOAL_EDITED -> "调整主线"
+        EventKind.GOAL_ARCHIVED -> "主线归档"
+        EventKind.NOTE -> "冒险手记"
+        EventKind.RESTORED -> "恢复存档"
     }
 }

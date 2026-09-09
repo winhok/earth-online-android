@@ -20,7 +20,10 @@ data class EarthUiState(
     val world: World = World(), val now: Long = System.currentTimeMillis(),
     val loading: Boolean = true, val loadError: Boolean = false, val busy: Boolean = false,
 ) { val day: Long get() = world.dayAt(now) }
-data class UiMessage(val text: String, val undoId: String? = null)
+data class UiMessage(
+    val request: SemanticRequest,
+    val undoId: String? = null,
+)
 private data class LoadedWorld(val world: World = World(), val failed: Boolean = false)
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -44,7 +47,9 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EarthUiState())
 
     fun retryLoad() { retry.value++ }
-    fun notify(text: String) { viewModelScope.launch { channel.send(UiMessage(text)) } }
+    fun notify(key: SemanticKey, arguments: SemanticArguments = SemanticArguments.EMPTY) {
+        viewModelScope.launch { channel.send(UiMessage(SemanticRequest(key, arguments))) }
+    }
     private fun change(action: suspend () -> Unit) {
         viewModelScope.launch {
             if (working.value) return@launch
@@ -52,11 +57,11 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
             try { action() }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {
-                channel.send(UiMessage(when (error) {
-                    is RuleViolation -> error.reason.message()
-                    is IOException -> "文件读写失败。请检查存储空间和文件访问权限。"
-                    else -> "操作遇到错误，请检查当前状态后重试。导入文件必须完整且版本兼容。"
-                }))
+                channel.send(UiMessage(SemanticRequest(when (error) {
+                    is RuleViolation -> error.reason.semantic()
+                    is IOException -> NotificationSemantic.FILE_IO_FAILED
+                    else -> NotificationSemantic.OPERATION_FAILED
+                })))
             } finally { working.value = false }
         }
     }
@@ -64,10 +69,19 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
     fun saveQuest(draft: QuestDraft, success: () -> Unit) = change { repo.saveQuest(draft); success() }
     fun complete(id: String) = change {
         val result = repo.complete(id)
-        if (result.changed) channel.send(UiMessage("任务完成 · +${result.completion.xp} XP", result.completion.id))
+        if (result.changed) channel.send(UiMessage(
+            SemanticRequest(NotificationSemantic.QUEST_COMPLETED, semanticArguments {
+                put(SemanticParameters.XP, XpAmount(result.completion.xp))
+            }),
+            result.completion.id,
+        ))
     }
-    fun undo(id: String) = change { if (repo.undo(id)) channel.send(UiMessage("已撤销，经验也已恢复至完成前。")) }
-    fun postpone(id: String) = change { repo.postpone(id); channel.send(UiMessage("已暂缓一天。原截止日期保留，不扣经验。")) }
+    fun undo(id: String) = change { if (repo.undo(id)) channel.send(UiMessage(
+        SemanticRequest(NotificationSemantic.COMPLETION_UNDONE),
+    )) }
+    fun postpone(id: String) = change { repo.postpone(id); channel.send(UiMessage(
+        SemanticRequest(NotificationSemantic.QUEST_POSTPONED),
+    )) }
     fun setQuestState(id: String, status: QuestState) = change { repo.setQuestState(id, status) }
     fun saveGoal(id: String?, title: String, description: String, success: () -> Unit) = change {
         repo.saveGoal(id, title, description); success()
@@ -78,7 +92,7 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
         try { Reminders.configure(app, enabled) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) {
-            channel.send(UiMessage("存档已保存，但提醒调度失败。请重新打开应用后检查提醒设置。"))
+            channel.send(UiMessage(SemanticRequest(NotificationSemantic.REMINDER_CONFIG_FAILED)))
         }
     }
     fun savePlayer(name: String, server: String, theme: ThemeMode, reminders: Boolean, hour: Int, success: () -> Unit) = change {
@@ -92,7 +106,7 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
             val output = app.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("No output stream")
             output.use { it.write(text.toByteArray(Charsets.UTF_8)); it.flush() }
         }
-        channel.send(UiMessage("存档已导出。此文件为明文，请妥善保存。"))
+        channel.send(UiMessage(SemanticRequest(NotificationSemantic.BACKUP_EXPORTED)))
     }
     fun prepareRestore(uri: Uri) = change {
         restoreDraft.value = withContext(Dispatchers.IO) {
@@ -122,7 +136,7 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
         restoreDraft.value = null
         configureReminder(false)
         success()
-        channel.send(UiMessage("存档已恢复，提醒已关闭。需要时请重新开启。"))
+        channel.send(UiMessage(SemanticRequest(NotificationSemantic.BACKUP_RESTORED)))
     }
     fun reset(success: () -> Unit) = change {
         repo.reset(); configureReminder(false); restoreDraft.value = null; success()

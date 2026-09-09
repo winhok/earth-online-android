@@ -37,7 +37,7 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
     LaunchedEffect(model) {
         model.messages.collect { message ->
             val result = snackbar.showSnackbar(
-                message.text,
+                presenter.present(message.request).text,
                 actionLabel = message.undoId?.let { presenter.text(ActionSemantic.UNDO_COMPLETION, semanticArguments {
                     put(SemanticParameters.UNDO_COMPLETION_LABEL, UndoCompletionLabel.SHORT)
                 }) },

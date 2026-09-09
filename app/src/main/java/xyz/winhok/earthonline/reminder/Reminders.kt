@@ -24,7 +24,7 @@ import kotlinx.coroutines.CancellationException
 import xyz.winhok.earthonline.EarthApplication
 import xyz.winhok.earthonline.MainActivity
 import xyz.winhok.earthonline.R
-import xyz.winhok.earthonline.core.QuestRules
+import xyz.winhok.earthonline.core.*
 
 object Reminders {
     const val CHANNEL = "daily_adventure"
@@ -38,8 +38,11 @@ object Reminders {
         val manager = requireNotNull(context.getSystemService(NotificationManager::class.java)) {
             "NotificationManager unavailable"
         }
-        manager.createNotificationChannel(NotificationChannel(CHANNEL,
-            context.getString(R.string.notification_channel), NotificationManager.IMPORTANCE_DEFAULT))
+        manager.createNotificationChannel(NotificationChannel(
+            CHANNEL,
+            narrativeText(NotificationSemantic.REMINDER_CHANNEL),
+            NotificationManager.IMPORTANCE_DEFAULT,
+        ))
         val work = WorkManager.getInstance(context)
         if (!enabled) {
             work.cancelUniqueWork(WORK_NAME)
@@ -79,8 +82,10 @@ class ReminderWorker(context: Context, parameters: WorkerParameters) : Coroutine
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val notification = NotificationCompat.Builder(applicationContext, Reminders.CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle(applicationContext.getString(R.string.notification_title))
-                .setContentText(applicationContext.getString(R.string.notification_body, count))
+                .setContentTitle(narrativeText(NotificationSemantic.REMINDER_TITLE))
+                .setContentText(narrativeText(NotificationSemantic.REMINDER_AVAILABLE, semanticArguments {
+                    put(SemanticParameters.COUNT, CountValue(count))
+                }))
                 .setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).build()
             NotificationManagerCompat.from(applicationContext).notify(Reminders.NOTIFICATION_ID, notification)
@@ -98,3 +103,13 @@ class ReminderWorker(context: Context, parameters: WorkerParameters) : Coroutine
         }
     }
 }
+
+private fun narrativeText(
+    key: SemanticKey,
+    arguments: SemanticArguments = SemanticArguments.EMPTY,
+): String = NarrativeRegistry.builtIns().interpret(
+    NarrativeSystemId.EARTH_NATIVE,
+    SemanticRequest(key, arguments),
+    NarrativeLocale.ZH_CN,
+    NarrativeScheme.DARK,
+).text

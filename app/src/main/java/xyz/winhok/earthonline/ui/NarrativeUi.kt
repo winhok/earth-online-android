@@ -19,6 +19,7 @@ import xyz.winhok.earthonline.core.semanticArguments
 import xyz.winhok.earthonline.core.Difficulty
 import xyz.winhok.earthonline.core.QuestKind
 import xyz.winhok.earthonline.core.Skill
+import xyz.winhok.earthonline.core.ThemeMode
 
 fun interface NarrativePresenter {
     fun present(request: SemanticRequest): NarrativePresentation
@@ -88,4 +89,10 @@ fun Skill.narrativeKey(): ScreenSemantic = when (this) {
     Skill.CREATION -> ScreenSemantic.SKILL_CREATION
     Skill.CONNECTION -> ScreenSemantic.SKILL_CONNECTION
     Skill.DISCIPLINE -> ScreenSemantic.SKILL_DISCIPLINE
+}
+
+fun ThemeMode.narrativeKey(): ScreenSemantic = when (this) {
+    ThemeMode.SYSTEM -> ScreenSemantic.THEME_SYSTEM
+    ThemeMode.LIGHT -> ScreenSemantic.THEME_LIGHT
+    ThemeMode.DARK -> ScreenSemantic.THEME_DARK
 }

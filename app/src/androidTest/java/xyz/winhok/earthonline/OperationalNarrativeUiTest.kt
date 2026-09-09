@@ -18,7 +18,14 @@ import xyz.winhok.earthonline.core.ThemeMode
 import xyz.winhok.earthonline.core.ActionSemantic
 import xyz.winhok.earthonline.core.Quest
 import xyz.winhok.earthonline.core.ScreenSemantic
+import xyz.winhok.earthonline.core.EventKind
+import xyz.winhok.earthonline.core.JournalEvent
+import xyz.winhok.earthonline.core.Player
+import xyz.winhok.earthonline.core.World
 import xyz.winhok.earthonline.ui.EarthTheme
+import xyz.winhok.earthonline.ui.EarthUiState
+import xyz.winhok.earthonline.ui.CharacterScreen
+import xyz.winhok.earthonline.ui.JournalScreen
 import xyz.winhok.earthonline.ui.NarrativeHost
 import xyz.winhok.earthonline.ui.NarrativePresenter
 import xyz.winhok.earthonline.ui.PrimaryNavigation
@@ -89,6 +96,43 @@ class OperationalNarrativeUiTest {
         assertTrue(ScreenSemantic.QUEST_REWARD in presenter.requests.map { it.key })
         assertTrue(ScreenSemantic.QUEST_PRIORITY_DIFFICULTY in presenter.requests.map { it.key })
         assertTrue(xyz.winhok.earthonline.core.StateSemantic.REVIEW_REQUIRED in presenter.requests.map { it.key })
+    }
+
+    @Test
+    fun profileAndJournalRequestStructuredSemanticsWhileKeepingOpaqueHistory() {
+        val presenter = RecordingPresenter()
+        val rawPlayer = "玩家 XP 原文 😀"
+        val rawHistory = "任务与 XP 都是玩家标题 😀"
+        val state = EarthUiState(
+            world = World(
+                player = Player(name = rawPlayer, zoneId = "Asia/Shanghai", onboarded = true),
+                events = listOf(JournalEvent(
+                    id = "event-1",
+                    kind = EventKind.COMPLETED,
+                    text = rawHistory,
+                    createdAt = 1_757_325_600_000L,
+                    xp = -25,
+                )),
+            ),
+            now = 1_757_325_600_000L,
+            loading = false,
+        )
+
+        compose.setContent {
+            EarthTheme(ThemeMode.DARK) {
+                NarrativeHost(presenter) {
+                    CharacterScreen(state)
+                    JournalScreen(state, note = {})
+                }
+            }
+        }
+
+        compose.onNodeWithText(rawPlayer).assertIsDisplayed()
+        compose.onNodeWithText(rawHistory).assertIsDisplayed()
+        val keys = presenter.requests.map { it.key }
+        assertTrue(ScreenSemantic.CHARACTER_TITLE in keys)
+        assertTrue(ScreenSemantic.EVENT_HEADER in keys)
+        assertTrue(ScreenSemantic.JOURNAL_XP in keys)
     }
 
     private class RecordingPresenter : NarrativePresenter {

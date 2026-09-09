@@ -1,6 +1,7 @@
 package xyz.winhok.earthonline.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -125,6 +126,93 @@ class NarrativeContractTest {
                 put(SemanticParameters.GOAL_PROGRESS, GoalProgress(2, 5, 7))
             }),
         )
+    }
+
+    @Test
+    fun earthNativeInterpretsProfileAndHistoryCopyFromStructuredFacts() {
+        val registry = NarrativeRegistry.builtIns()
+        fun text(key: SemanticKey, arguments: SemanticArguments = SemanticArguments.EMPTY) =
+            registry.interpret(
+                NarrativeSystemId.EARTH_NATIVE,
+                SemanticRequest(key, arguments),
+                NarrativeLocale.ZH_CN,
+                NarrativeScheme.DARK,
+            ).text
+
+        assertEquals("角色档案", text(ScreenSemantic.CHARACTER_TITLE))
+        assertEquals(
+            "6 天",
+            text(ScreenSemantic.CURRENT_STREAK, semanticArguments {
+                put(SemanticParameters.COUNT, CountValue(6))
+            }),
+        )
+        assertEquals(
+            "学识 · Lv.3",
+            text(ScreenSemantic.SKILL_LEVEL, semanticArguments {
+                put(SemanticParameters.SKILL_LEVEL, SkillLevel(Skill.KNOWLEDGE, LevelNumber(3)))
+            }),
+        )
+        assertEquals(
+            "2147483648 XP",
+            text(ScreenSemantic.SKILL_XP, semanticArguments {
+                put(SemanticParameters.TOTAL_XP, TotalXpAmount(2_147_483_648L))
+            }),
+        )
+        assertEquals("已解锁", text(StateSemantic.UNLOCKED))
+        assertEquals("第一步 · 完成 1 项任务", text(AchievementSemantic.FIRST_STEP))
+        assertEquals(
+            "任务完成 · 09-08 18:00",
+            text(ScreenSemantic.EVENT_HEADER, semanticArguments {
+                put(
+                    SemanticParameters.EVENT_HEADER,
+                    EventHeader(
+                        EventKind.COMPLETED,
+                        CompletionMoment(1_757_325_600_000L, "Asia/Shanghai"),
+                    ),
+                )
+            }),
+        )
+        assertEquals(
+            "-25 XP",
+            text(ScreenSemantic.JOURNAL_XP, semanticArguments {
+                put(SemanticParameters.SIGNED_XP, SignedXpAmount(-25))
+            }),
+        )
+    }
+
+    @Test
+    fun earthNativeInterpretsSettingsErrorsAndPrivateReminderCopy() {
+        val registry = NarrativeRegistry.builtIns()
+        fun text(key: SemanticKey, arguments: SemanticArguments = SemanticArguments.EMPTY) =
+            registry.interpret(
+                NarrativeSystemId.EARTH_NATIVE,
+                SemanticRequest(key, arguments),
+                NarrativeLocale.ZH_CN,
+                NarrativeScheme.DARK,
+            ).text
+
+        assertEquals("通知权限未开启，任务功能不受影响。可在系统设置中手动开启。",
+            text(NotificationSemantic.NOTIFICATION_PERMISSION_DENIED))
+        assertEquals("标题需为 1–120 个字符。", text(RuleError.TITLE.semantic()))
+        assertEquals("每日冒险提醒", text(NotificationSemantic.REMINDER_CHANNEL))
+        assertEquals("冒险仍在继续", text(NotificationSemantic.REMINDER_TITLE))
+        assertEquals(
+            "还有 4 项可执行任务。选一件小事，继续前进。",
+            text(NotificationSemantic.REMINDER_AVAILABLE, semanticArguments {
+                put(SemanticParameters.COUNT, CountValue(4))
+            }),
+        )
+        assertEquals(
+            "地球 Online 2.0-test",
+            text(ScreenSemantic.ABOUT_TITLE, semanticArguments {
+                put(SemanticParameters.VERSION_NAME, VersionName("2.0-test"))
+            }),
+        )
+        val restore = text(ScreenSemantic.RESTORE_SUMMARY, semanticArguments {
+            put(SemanticParameters.RESTORE_SUMMARY, RestoreSummary(1, 2, 3, 4, 5, 6, 7, 8))
+        })
+        assertTrue(restore.contains("债务记录变化：4 项（5 XP → 6 XP）"))
+        assertFalse(restore.contains("私人任务标题"))
     }
 
     @Test
