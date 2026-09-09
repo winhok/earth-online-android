@@ -51,6 +51,7 @@ fun ContractConfirmation(disclosure: ContractDisclosure, busy: Boolean, confirm:
 fun OverdueBatchDialog(state: EarthUiState, acknowledge: (Set<String>) -> Unit) {
     val presenter = LocalNarrativePresenter.current
     val pending = state.unacknowledged
+    val linesById = remember(state.deadline) { state.deadline.ledgerLines().associateBy { it.id } }
     var expanded by rememberSaveable(pending.map { it.id }.joinToString()) { mutableStateOf(false) }
     val total = pending.sumOf { it.xp }
     val progress = state.progress
@@ -76,7 +77,7 @@ fun OverdueBatchDialog(state: EarthUiState, acknowledge: (Set<String>) -> Unit) 
                     }), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.error) }
                     item { Text(presenter.text(ContractSemantic.BATCH_BODY)) }
                     items(if (expanded) pending else pending.take(3), key = { it.id }) { liability ->
-                        val line = state.deadline.ledgerLines().first { it.id == liability.id }
+                        val line = linesById.getValue(liability.id)
                         OutlinedCard(Modifier.fillMaxWidth()) {
                             Text(presenter.text(ContractSemantic.LEDGER_ENTRY, semanticArguments {
                                 put(ContractParameters.LEDGER, line)

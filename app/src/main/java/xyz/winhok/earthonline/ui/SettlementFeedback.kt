@@ -29,12 +29,13 @@ fun SettlementSnackbarHost(host: SnackbarHostState) {
     val presenter = LocalNarrativePresenter.current
     val feedback = LocalSettlementFeedback.current
     SnackbarHost(host) { data ->
+        val settledFeedback = remember(data) { feedback }
         val reduced = state.effects.reducedMotion || !ValueAnimator.areAnimatorsEnabled()
         val entrance = remember(data) { Animatable(if (reduced) 1f else 0f) }
         LaunchedEffect(data) {
             if (reduced) entrance.snapTo(1f) else entrance.animateTo(1f, tween(180))
         }
-        val title = when (feedback) {
+        val title = when (settledFeedback) {
             SettlementFeedback.COMPLETE -> ContractSemantic.FEEDBACK_COMPLETE
             SettlementFeedback.ACHIEVEMENT -> ContractSemantic.FEEDBACK_ACHIEVEMENT
             SettlementFeedback.LEVEL_UP -> ContractSemantic.FEEDBACK_UP
@@ -44,7 +45,7 @@ fun SettlementSnackbarHost(host: SnackbarHostState) {
             SettlementFeedback.UNDONE -> ContractSemantic.FEEDBACK_UNDONE
             null -> null
         }
-        val icon = when (feedback) {
+        val icon = when (settledFeedback) {
             SettlementFeedback.LEVEL_UP -> Icons.AutoMirrored.Filled.TrendingUp
             SettlementFeedback.LEVEL_DOWN -> Icons.AutoMirrored.Filled.TrendingDown
             SettlementFeedback.REPAID -> Icons.Default.AccountBalanceWallet
@@ -52,12 +53,12 @@ fun SettlementSnackbarHost(host: SnackbarHostState) {
             SettlementFeedback.UNDONE -> Icons.AutoMirrored.Filled.Undo
             else -> Icons.Default.CheckCircle
         }
-        val surface = when (feedback) {
+        val surface = when (settledFeedback) {
             SettlementFeedback.LEVEL_DOWN, SettlementFeedback.UNDONE -> MaterialTheme.colorScheme.errorContainer
             SettlementFeedback.LEVEL_UP, SettlementFeedback.RECOVERED -> MaterialTheme.colorScheme.secondaryContainer
             else -> MaterialTheme.colorScheme.primaryContainer
         }
-        val foreground = when (feedback) {
+        val foreground = when (settledFeedback) {
             SettlementFeedback.LEVEL_DOWN, SettlementFeedback.UNDONE -> MaterialTheme.colorScheme.onErrorContainer
             SettlementFeedback.LEVEL_UP, SettlementFeedback.RECOVERED -> MaterialTheme.colorScheme.onSecondaryContainer
             else -> MaterialTheme.colorScheme.onPrimaryContainer
