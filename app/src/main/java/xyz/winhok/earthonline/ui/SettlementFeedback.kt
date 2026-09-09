@@ -8,6 +8,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,11 +45,11 @@ fun SettlementSnackbarHost(host: SnackbarHostState) {
             null -> null
         }
         val icon = when (feedback) {
-            SettlementFeedback.LEVEL_UP -> Icons.Default.TrendingUp
-            SettlementFeedback.LEVEL_DOWN -> Icons.Default.TrendingDown
+            SettlementFeedback.LEVEL_UP -> Icons.AutoMirrored.Filled.TrendingUp
+            SettlementFeedback.LEVEL_DOWN -> Icons.AutoMirrored.Filled.TrendingDown
             SettlementFeedback.REPAID -> Icons.Default.AccountBalanceWallet
             SettlementFeedback.RECOVERED, SettlementFeedback.ACHIEVEMENT -> Icons.Default.AutoAwesome
-            SettlementFeedback.UNDONE -> Icons.Default.Undo
+            SettlementFeedback.UNDONE -> Icons.AutoMirrored.Filled.Undo
             else -> Icons.Default.CheckCircle
         }
         val surface = when (feedback) {
