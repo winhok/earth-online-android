@@ -246,6 +246,29 @@ object DeadlineScenarios {
             val a=save(initial(),"a");val b=save(initial(),"a")
             check(a.book.progress(a.world)==b.book.progress(b.world))
         }
+        test("editing a legacy title never opts it into an old deadline") {
+            val q = Quest("old", "original", dueDay = today - 100, createdAt = start - 100, updatedAt = start)
+            val s = initial().copy(world = initial().world.copy(quests = listOf(q)))
+            val command = DeadlineCommand.Save(draft(q).copy(title = "clarified"), "old")
+            check(DeadlineEngine.preview(s, command, start) == null)
+            val after = DeadlineEngine.execute(s, command, start).state
+            check(after.book.contracts.isEmpty() && after.world.quests.single().title == "clarified")
+        }
+        test("an already overdue promise may be clarified without resigning") {
+            val s = DeadlineEngine.reconcile(save(initial(), "a"), start + 86_400_000)
+            val command = DeadlineCommand.Save(draft(s.world.quests.single()).copy(title = "smaller action"), "a")
+            check(DeadlineEngine.preview(s, command, start + 86_400_000) == null)
+            val after = DeadlineEngine.execute(s, command, start + 86_400_000).state
+            check(after.book.contracts.size == 1 && after.book.liabilities.size == 1)
+            check(after.book.contracts.single().titleSnapshot == s.world.quests.single().title)
+        }
+        test("daily postpone skips only the present day even on repeated requests") {
+            val q = Quest("daily", "daily", kind = QuestKind.DAILY, createdAt = start, updatedAt = start)
+            var s = initial().copy(world = initial().world.copy(quests = listOf(q)))
+            repeat(4) { s = apply(s, DeadlineCommand.Postpone("daily")) }
+            check(s.world.quests.single().snoozedUntilDay == today + 1)
+            check(s.book.liabilities.isEmpty())
+        }
         report("$count deadline scenarios passed")
         return count
     }

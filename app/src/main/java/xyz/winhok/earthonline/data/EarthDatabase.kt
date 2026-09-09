@@ -51,6 +51,9 @@ class Converters {
 
 @Dao
 interface EarthDao {
+    @Query("SELECT * FROM settlement_receipts ORDER BY consequenceId") suspend fun settlementReceipts(): List<SettlementReceiptEntity>
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun putSettlementReceipt(value: SettlementReceiptEntity)
+    @Query("DELETE FROM settlement_receipts") suspend fun clearSettlementReceipts()
     @Query("SELECT * FROM progress_history WHERE id = 1") suspend fun progressHistory(): ProgressHistoryEntity?
     @Query("SELECT * FROM effect_preferences WHERE id = 1") suspend fun effects(): EffectPreferencesEntity?
     @Query("SELECT * FROM presentation_preferences ORDER BY narrativeId, preferenceKey") suspend fun presentationPreferences(): List<PresentationPreferenceEntity>
@@ -70,7 +73,7 @@ interface EarthDao {
     @Query("SELECT * FROM goals WHERE id = :id") suspend fun goal(id: String): GoalEntity?
     @Query("SELECT * FROM completions WHERE id = :id") suspend fun completion(id: String): CompletionEntity?
     @Query("SELECT * FROM narrative_preferences WHERE playerId = 1") suspend fun narrativePreference(): NarrativePreferenceEntity?
-    @Query("SELECT * FROM contracts ORDER BY signedAt, id") suspend fun contracts(): List<ContractEntity>
+    @Query("SELECT * FROM contracts ORDER BY signedAt, rowid") suspend fun contracts(): List<ContractEntity>
     @Query("SELECT * FROM contract_revisions ORDER BY createdAt, id") suspend fun contractRevisions(): List<ContractRevisionEntity>
     @Query("SELECT * FROM consequence_events ORDER BY createdAt, id") suspend fun consequences(): List<ConsequenceEventEntity>
     @Query("SELECT * FROM consequence_adjustments ORDER BY createdAt, id") suspend fun consequenceAdjustments(): List<ConsequenceAdjustmentEntity>
@@ -130,6 +133,7 @@ interface EarthDao {
         RecoveryRouteEntity::class,
         RecoveryNodeEntity::class,
         ProgressHistoryEntity::class, EffectPreferencesEntity::class, PresentationPreferenceEntity::class,
+        SettlementReceiptEntity::class,
     ],
     version = 3, exportSchema = true,
 )

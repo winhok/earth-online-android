@@ -20,10 +20,17 @@ enum class ContractSemantic(override val wireId: String): SemanticKey {
     STORY_COLLAPSE("screen.story-collapse"), STORY_EXPAND("screen.story-expand"), STORY_READ("screen.story-read"),
     INTRO_PREVIEW("screen.intro-preview"), ACTIVE_XP("screen.active-xp"), HISTORICAL_XP("screen.historical-xp"),
     HIGHEST_LEVEL("screen.highest-level"), POSTPONE_SIGNED("screen.postpone-signed"),
+    BATCH_TITLE("screen.batch-title"), BATCH_BODY("screen.batch-body"), BATCH_TOTAL("screen.batch-total"),
+    ACKNOWLEDGE("screen.acknowledge"), EXPAND("screen.expand"), COLLAPSE("screen.collapse"),
+    RECOVERY_PENDING("screen.recovery-pending"), STORY_FIRST_ACTION("screen.story-first-action"),
+    STORY_FIRST_PROMISE("screen.story-first-promise"), STORY_RETURN("screen.story-return"),
+    RETURN_TO_TASKS("screen.return-to-tasks"), GESTURE_HINT("screen.gesture-hint"),
+    CONTRACT_HISTORY("screen.contract-history"),
     ;
     override val category = SemanticCategory.SCREEN
 }
 
+data class OverdueBatchData(val count: Int, val cost: Long, val levelWithoutBatch: Int, val currentLevel: Int)
 data class ContractCardData(val status: String, val dueDay: Long, val zoneId: String,
     val originalReward: Long, val attainableReward: Long, val extensions: Int, val fulfilledLate: Boolean)
 data class RecoverySelectionData(val selectedXp: Long, val debtXp: Long, val count: Int)
@@ -39,6 +46,7 @@ object ContractParameters {
     val SELECTION = SemanticParameter<RecoverySelectionData>("recovery-selection")
     val SETTLEMENT = SemanticParameter<SettlementData>("settlement")
     val LEDGER = SemanticParameter<LedgerLine>("ledger-entry")
+    val BATCH = SemanticParameter<OverdueBatchData>("overdue-batch")
 }
 
 /** Read-only projection. IDs and arithmetic come from the ledger, never from the current skin. */
@@ -46,7 +54,7 @@ fun DeadlineState.ledgerLines(): List<LedgerLine> {
     val contracts=book.contracts.associateBy { it.id }
     val liabilities=book.liabilities.associateBy { it.id }
     fun title(c: TimeContract?) = c?.let { contract ->
-        world.events.filter { it.questId==contract.questId && it.createdAt<=contract.signedAt && it.kind in setOf(EventKind.CREATED,EventKind.EDITED) }
+        contract.titleSnapshot.takeIf { it.isNotBlank() } ?: world.events.filter { it.questId==contract.questId && it.createdAt<=contract.signedAt && it.kind in setOf(EventKind.CREATED,EventKind.EDITED) }
             .maxByOrNull { it.createdAt }?.text ?: world.quests.firstOrNull { it.id==contract.questId }?.title
     }.orEmpty()
     return buildList {
@@ -76,6 +84,17 @@ internal object DeadlineNarrative {
         fun text(value: String,role: IconRole=IconRole.NEUTRAL) = NarrativeSemanticEntry(emptySet()) { NarrativePresentation(value,role) }
         val map=linkedMapOf<SemanticKey,NarrativeSemanticEntry>(
             ContractSemantic.TITLE to text(contract,IconRole.WARNING),
+            ContractSemantic.BATCH_TITLE to text(if(cultivation) "劫痕结算 · 仍有归途" else "逾期结算 · 可以恢复",IconRole.WARNING),
+            ContractSemantic.BATCH_BODY to text("以下契约已按原约定结算一次，离线多日不会重复扣除。核对后继续操作；确认只是已读，不额外扣除，也不豁免债务。以后可在账本查看。等级对比按当前账面加入本批代价反算，非历史最高等级。"),
+            ContractSemantic.ACKNOWLEDGE to text("已核对，继续行动"),
+            ContractSemantic.EXPAND to text("展开完整明细"), ContractSemantic.COLLAPSE to text("收起明细"),
+            ContractSemantic.RECOVERY_PENDING to text("债务出现后可以继续完成真实任务偿还。达到重复失约或整级债务门槛时，系统开启路线；不会强加虚构任务。"),
+            ContractSemantic.RETURN_TO_TASKS to text("返回任务，选择下一步"),
+            ContractSemantic.GESTURE_HINT to text("右滑完成 · 左滑查看操作；也可直接使用按钮"),
+            ContractSemantic.CONTRACT_HISTORY to text("契约历史与补偿"),
+            ContractSemantic.STORY_FIRST_ACTION to text(if(cultivation) "初入尘世：第一份修为来自你完成的真实行动。" else "第一步：你已用一次真实行动留下记录。"),
+            ContractSemantic.STORY_FIRST_PROMISE to text(if(cultivation) "天命有约：承诺前明示代价，履约与失约都留下因果。" else "第一次承诺：你已明确签订过日期与代价。"),
+            ContractSemantic.STORY_RETURN to text(if(cultivation) "重返仙途：劫债已解，一轮重修结束。旧劫痕保留，但不替未来判决。" else "重返正轨：一轮恢复已经结束。历史保留，未来由新的行动决定。"),
             ContractSemantic.CALIBRATE to text(if(cultivation) "校准旧天命 / 重新立契" else "校准旧日期 / 重新签约"),
             ContractSemantic.UNSIGNED to text("旧任务 · 未签约。未经你确认，不追罚；仍可按原规则完成。"),
             ContractSemantic.REVIEW to text("已延期三次：请重新决策。再次延期将结算旧契约 50% 原始奖励的代价，并签订新契约。"),
@@ -122,7 +141,7 @@ internal object DeadlineNarrative {
                 add(d.title)
                 if(DisclosureKind.POST_DEADLINE_UNDO in d.kinds) add("撤销会移除原完成奖励 ${d.reward} $xp，并因原截止日期已过结算 ${d.immediateCost} $xp 代价。重做保留原奖励快照。")
                 else if(d.immediateCost>0) add("本次先结算旧契约代价 ${d.immediateCost} $xp。")
-                if(d.reward>0 && DisclosureKind.POST_DEADLINE_UNDO !in d.kinds) add("可获奖励 ${d.reward} $xp；逾期代价 ${d.overdueCost} $xp，仅结算一次，不按离线天数累加。")
+                if(d.reward>0 && DisclosureKind.POST_DEADLINE_UNDO !in d.kinds) add("可获奖励 ${d.reward} $xp；原始奖励 / 逾期全额代价 ${d.overdueCost} $xp；提前主动弃约代价 ${ContractMath.abandonment(d.overdueCost)} $xp（50% 向上取整）。逾期仅结算一次，不按离线天数累加。")
                 d.dueDay?.let { add("截止 ${LocalDate.ofEpochDay(it)} 当日结束 · ${d.zoneId}") }
                 if(d.dueToday) add("今天截止：只剩今天的剩余时间，不是完整 24 小时。")
                 if(d.extensionCount>0) add("这是第 ${d.extensionCount} 次延期；新奖励仅影响尚未取得的奖励，不重写已有完成快照。")
@@ -130,6 +149,10 @@ internal object DeadlineNarrative {
                 if(DisclosureKind.FORCE_MAJEURE in d.kinds) add("豁免未偿代价 ${d.waivedXp} $xp；返还已偿代价 ${d.restitutionXp} $xp。不发放任务完成奖励，原始账目保留。")
                 add("取消不会执行本次操作。")
             }.joinToString("\n\n"),IconRole.WARNING,ColorRole.WARNING)
+        }
+        map[ContractSemantic.BATCH_TOTAL]=NarrativeSemanticEntry(setOf(ContractParameters.BATCH)) { a ->
+            val b=a.require(ContractParameters.BATCH)
+            NarrativePresentation("${b.count} 份契约 · 本批代价 ${b.cost} $xp\n无本批代价 Lv.${b.levelWithoutBatch} → 当前 Lv.${b.currentLevel}",IconRole.WARNING,ColorRole.WARNING)
         }
         map[ContractSemantic.INFO]=NarrativeSemanticEntry(setOf(ContractParameters.CARD)) { a -> val c=a.require(ContractParameters.CARD)
             val status=when(c.status){"ACTIVE"->"生效中";"FULFILLED"->"按时履约";"OVERDUE"->"逾期已结算";"ABANDONED"->"主动解约";"EXEMPTED"->"现实豁免";else->c.status}

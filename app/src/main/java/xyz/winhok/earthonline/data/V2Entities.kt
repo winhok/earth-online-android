@@ -67,6 +67,7 @@ data class ContractEntity(
     @ColumnInfo(defaultValue = "0") val extensionCount: Int = ContractMath.inferExtensions(originalRewardXp, currentRewardXp),
     val fulfilledAt: Long? = if (status == "FULFILLED") closedAt else null,
     val activeQuestId: String? = if (status == "ACTIVE") questId else null,
+    @ColumnInfo(defaultValue = "''") val titleSnapshot: String = "",
 ) : ContractRecord
 
 @Entity(

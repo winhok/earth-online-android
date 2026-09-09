@@ -30,6 +30,9 @@ object DeadlineMigration {
             db.execSQL("CREATE TABLE IF NOT EXISTS progress_history (id INTEGER NOT NULL PRIMARY KEY, highestLevel INTEGER NOT NULL)")
             db.execSQL("CREATE TABLE IF NOT EXISTS effect_preferences (id INTEGER NOT NULL PRIMARY KEY, sound INTEGER NOT NULL, haptics INTEGER NOT NULL, reducedMotion INTEGER NOT NULL)")
             db.execSQL("CREATE TABLE IF NOT EXISTS presentation_preferences (narrativeId TEXT NOT NULL, preferenceKey TEXT NOT NULL, enabled INTEGER NOT NULL, PRIMARY KEY(narrativeId, preferenceKey))")
+            db.execSQL("ALTER TABLE contracts ADD COLUMN titleSnapshot TEXT NOT NULL DEFAULT ''")
+            db.execSQL("UPDATE contracts SET titleSnapshot=COALESCE((SELECT title FROM quests WHERE quests.id=contracts.questId), '')")
+            db.execSQL("CREATE TABLE IF NOT EXISTS settlement_receipts (consequenceId TEXT NOT NULL PRIMARY KEY, acknowledgedAt INTEGER NOT NULL, FOREIGN KEY(consequenceId) REFERENCES consequence_events(id) ON UPDATE NO ACTION ON DELETE RESTRICT)")
             // No contracts or liabilities are created for legacy dated tasks. Calibration is explicit.
         }
     }

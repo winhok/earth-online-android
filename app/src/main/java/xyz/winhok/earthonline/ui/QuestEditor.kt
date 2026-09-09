@@ -116,6 +116,9 @@ fun QuestEditor(quest: Quest?, goals: List<Goal>, hasHistory: Boolean, busy: Boo
                     put(SemanticParameters.TEXT_LENGTH, CountValue(description.length))
                 })) }, minLines = 4, maxLines = 10,
                 enabled = !busy, modifier = Modifier.fillMaxWidth()) }
+            if (kind != QuestKind.DAILY && dueDay != null) item {
+                Text(presenter.text(ContractSemantic.RULES), style = MaterialTheme.typography.bodySmall)
+            }
             item { Spacer(Modifier.height(24.dp)) }
         }
     }
@@ -182,9 +185,13 @@ fun NoteEditor(busy: Boolean, onDismiss: () -> Unit, onSave: (String) -> Unit) {
 
 @Composable
 fun QuestDetail(quest: Quest, state: EarthUiState, onDismiss: () -> Unit, onEdit: () -> Unit,
-                onComplete: () -> Unit, onUndo: (String) -> Unit, onPostpone: () -> Unit, onState: (QuestState) -> Unit) {
+                onComplete: () -> Unit, onUndo: (String) -> Unit, onPostpone: () -> Unit, onState: (QuestState) -> Unit,
+                onCalibrate: () -> Unit = {}, onLedger: () -> Unit = {},
+                onWaive: (String, ForceMajeureReason) -> Unit = { _, _ -> }) {
     val presenter = LocalNarrativePresenter.current
     var archive by rememberSaveable(quest.id) { mutableStateOf(false) }
+    var forceOpen by rememberSaveable(quest.id) { mutableStateOf(false) }
+    val contract = state.book.latest(quest.id)
     val completion = QuestRules.activeCompletion(quest, state.world.completions, state.day)
     val goal = state.world.goals.firstOrNull { it.id == quest.goalId }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(quest.title, maxLines = 4) },
@@ -192,13 +199,29 @@ fun QuestDetail(quest: Quest, state: EarthUiState, onDismiss: () -> Unit, onEdit
             Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(presenter.questMeta(quest, state.day))
+                if (contract != null) {
+                    ContractInfo(contract)
+                    if (contract.extensionCount >= 3 && contract.status == "ACTIVE") Text(presenter.text(ContractSemantic.REVIEW))
+                    TextButton(onClick = onLedger) { Text(presenter.text(ContractSemantic.CONTRACT_HISTORY)) }
+                    if (contract.status !in setOf("FULFILLED", "EXEMPTED")) TextButton(onClick = { forceOpen = true },
+                        enabled = !state.busy, modifier = Modifier.testTag("waive-contract")) {
+                        Text(presenter.text(ActionSemantic.APPLY_FORCE_MAJEURE))
+                    }
+                } else if (quest.kind != QuestKind.DAILY && quest.dueDay != null && completion == null) {
+                    Text(presenter.text(ContractSemantic.UNSIGNED), Modifier.testTag("legacy-unsigned"))
+                    if ((quest.dueDay ?: Long.MIN_VALUE) >= state.day) OutlinedButton(onClick = onCalibrate,
+                        enabled = !state.busy, modifier = Modifier.testTag("calibrate-contract")) {
+                        Text(presenter.text(ContractSemantic.CALIBRATE))
+                    }
+                    TextButton(onClick = onEdit) { Text(presenter.text(ActionSemantic.RESCHEDULE_CONTRACT)) }
+                }
                 if (goal != null) Text(presenter.text(ScreenSemantic.QUEST_GOAL, semanticArguments {
                     put(SemanticParameters.TITLE, OpaqueText(goal.title))
                 }))
                 if (quest.description.isNotBlank()) Text(quest.description)
                 Text(presenter.text(ScreenSemantic.QUEST_DETAIL_STATS, semanticArguments {
                     put(SemanticParameters.QUEST_DETAIL,
-                        QuestDetailPresentation(completion?.xp ?: QuestRules.reward(quest), quest.postponeCount))
+                        QuestDetailPresentation(completion?.xp ?: state.reward(quest), quest.postponeCount))
                 }))
                 if (quest.postponeCount >= 3) Text(presenter.text(ScreenSemantic.QUEST_REVIEW_GUIDANCE),
                     color = MaterialTheme.colorScheme.secondary)
@@ -223,7 +246,7 @@ fun QuestDetail(quest: Quest, state: EarthUiState, onDismiss: () -> Unit, onEdit
                 }
                 OutlinedButton(onClick = onEdit, enabled = !state.busy) { Text(presenter.text(ActionSemantic.EDIT_QUEST)) }
                 if (quest.state == QuestState.ACTIVE && completion == null) {
-                    TextButton(onClick = onPostpone, enabled = !state.busy) { Text(presenter.text(ActionSemantic.POSTPONE_QUEST)) }
+                    TextButton(onClick = onPostpone, enabled = !state.busy) { Text(presenter.text(if (contract?.status == "ACTIVE") ContractSemantic.POSTPONE_SIGNED else ActionSemantic.POSTPONE_QUEST)) }
                     TextButton(onClick = { onState(QuestState.PAUSED) }, enabled = !state.busy) {
                         Text(presenter.text(ActionSemantic.PAUSE_QUEST))
                     }
@@ -240,10 +263,13 @@ fun QuestDetail(quest: Quest, state: EarthUiState, onDismiss: () -> Unit, onEdit
                 }
             }
         }, confirmButton = { TextButton(onClick = onDismiss) { Text(presenter.text(ActionSemantic.CLOSE)) } })
+    if (forceOpen && contract != null) ForceMajeureDialog(contract, state.busy, { forceOpen = false }) { reason ->
+        forceOpen = false; onWaive(contract.id, reason)
+    }
     if (archive) AlertDialog(onDismissRequest = { archive = false },
         title = { Text(presenter.text(ScreenSemantic.ARCHIVE_QUEST_TITLE)) },
         text = { Text(presenter.text(ScreenSemantic.ARCHIVE_QUEST_BODY)) },
-        confirmButton = { TextButton(onClick = { onState(QuestState.ARCHIVED) }, enabled = !state.busy) {
+        confirmButton = { TextButton(onClick = { archive = false; onState(QuestState.ARCHIVED) }, enabled = !state.busy) {
             Text(presenter.text(ActionSemantic.ARCHIVE_QUEST, semanticArguments {
                 put(SemanticParameters.ARCHIVE_QUEST_LABEL, ArchiveQuestLabel.CONFIRM)
             }))

@@ -256,7 +256,7 @@ object BackupV2Rules {
             val waived = DebtRules.safeSum(changes.asSequence().filter { it.kind in setOf("WAIVER", "RESTITUTION") }.map { it.xp })
             val refunded = DebtRules.safeSum(changes.asSequence().filter { it.kind == "REFUND" }.map { it.xp })
             val historicalPaid = DebtRules.safeSum(graph.repaymentAllocations.filter { it.consequenceId == consequence.id && it.reversalOf == null }.asSequence().map { it.xp })
-            requireBackup(waived <= consequence.xp && DebtRules.safeAdd(allocated, waived) <= DebtRules.safeAdd(consequence.xp, refunded) && refunded <= historicalPaid && refunded <= consequence.xp)
+            requireBackup(waived <= consequence.xp && DebtRules.safeAdd(allocated, waived) <= consequence.xp && refunded <= historicalPaid && refunded <= consequence.xp)
         }
         DebtRules.outstandingXp(graph.consequences, graph.consequenceAdjustments, graph.repaymentAllocations)
 

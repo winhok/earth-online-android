@@ -10,10 +10,10 @@ import androidx.compose.ui.unit.dp
 import xyz.winhok.earthonline.core.*
 
 @Composable
-fun CharacterScreen(state: EarthUiState) {
+fun CharacterScreen(state: EarthUiState, model: EarthViewModel? = null, ledger: () -> Unit = {}) {
     val presenter = LocalNarrativePresenter.current
     val world = state.world
-    val progress = ProgressRules.total(world.completions)
+    val progress = state.progress.current
     val done = world.completions.count { it.revokedAt == null }
     val badges = ProgressRules.achievements(world)
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -37,6 +37,8 @@ fun CharacterScreen(state: EarthUiState) {
                 }
             }
         }
+        item { ContractBalance(state, ledger) }
+        if (model != null) item { WorldStory(state, model) }
         item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SmallStat(progress.xp.toString(), presenter.text(ScreenSemantic.TOTAL_XP), Modifier.weight(1f))
             SmallStat(done.toString(), presenter.text(ScreenSemantic.COMPLETION_COUNT), Modifier.weight(1f))

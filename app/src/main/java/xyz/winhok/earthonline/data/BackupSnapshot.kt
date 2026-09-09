@@ -19,6 +19,7 @@ data class BackupSnapshot(
     val progressHistory: ProgressHistoryEntity = ProgressHistoryEntity(),
     val effects: EffectPreferencesEntity = EffectPreferencesEntity(),
     val presentationPreferences: List<PresentationPreferenceEntity> = emptyList(),
+    val settlementReceipts: List<SettlementReceiptEntity> = emptyList(),
 ) {
     fun displayNarrativeId(knownNarrativeIds: Set<String>): String =
         narrativePreference.narrativeId.takeIf { it in knownNarrativeIds }

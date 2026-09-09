@@ -14,3 +14,10 @@ data class EffectPreferencesEntity(@PrimaryKey val id: Int = 1,
 /** Whitelisted booleans only: presentation records cannot hold XP, debt or commands. */
 @Entity(tableName = "presentation_preferences", primaryKeys = ["narrativeId", "preferenceKey"])
 data class PresentationPreferenceEntity(val narrativeId: String, val preferenceKey: String, val enabled: Boolean)
+
+/** Presentation acknowledgement only. This can neither settle nor waive any liability. */
+@Entity(tableName = "settlement_receipts", foreignKeys = [androidx.room.ForeignKey(
+    entity = ConsequenceEventEntity::class, parentColumns = ["id"], childColumns = ["consequenceId"],
+    onDelete = androidx.room.ForeignKey.RESTRICT,
+)])
+data class SettlementReceiptEntity(@PrimaryKey val consequenceId: String, val acknowledgedAt: Long)

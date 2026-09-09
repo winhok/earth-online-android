@@ -28,6 +28,12 @@ object BackupSnapshotValidator {
             throw RuleViolation(RuleError.INVALID_BACKUP)
         if(snapshot.progressHistory.id!=1 || snapshot.effects.id!=1 || snapshot.presentationPreferences.size>128)
             throw RuleViolation(RuleError.INVALID_BACKUP)
+        val receipts = snapshot.settlementReceipts
+        val liabilities = snapshot.consequences.associateBy { it.id }
+        if (receipts.map { it.consequenceId }.distinct().size != receipts.size || receipts.any {
+            val liability = liabilities[it.consequenceId]
+            liability == null || liability.kind != "OVERDUE" || it.acknowledgedAt < liability.createdAt
+        }) throw RuleViolation(RuleError.INVALID_BACKUP)
         val prefs=snapshot.presentationPreferences
         if(prefs.map { it.narrativeId to it.preferenceKey }.distinct().size!=prefs.size || prefs.any {
             !it.narrativeId.matches(Regex("[A-Za-z0-9_.:-]{1,120}")) || it.preferenceKey !in setOf("intro_seen","story_collapsed")

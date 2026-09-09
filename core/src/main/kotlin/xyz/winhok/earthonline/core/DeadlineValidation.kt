@@ -7,6 +7,7 @@ object DeadlineValidation {
         requireRule(book.highestLevel in 1..ProgressRules.fromXp(3_750_000).level, RuleError.INVALID_BACKUP)
         requireRule(book.routes.count { it.status == "OPEN" } <= 1, RuleError.INVALID_BACKUP)
         book.contracts.forEach { c ->
+            requireRule(c.titleSnapshot.length <= 120, RuleError.INVALID_BACKUP)
             requireRule(c.extensionCount in 0..3 && c.currentRewardXp == ContractMath.attainable(c.originalRewardXp,c.extensionCount), RuleError.INVALID_BACKUP)
             requireRule(c.signedKind != QuestKind.DAILY && c.originalRewardXp in
                 (if(c.signedKind==QuestKind.BOSS) setOf(35L,50L,75L) else setOf(10L,25L,50L)), RuleError.INVALID_BACKUP)

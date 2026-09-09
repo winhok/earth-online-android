@@ -12,6 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalView
+import android.view.HapticFeedbackConstants
+import android.view.SoundEffectConstants
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -21,6 +24,11 @@ import xyz.winhok.earthonline.core.*
 @Composable
 fun EarthApp(model: EarthViewModel, state: EarthUiState) {
     val presenter = LocalNarrativePresenter.current
+    val latestPresenter by rememberUpdatedState(presenter)
+    val latestState by rememberUpdatedState(state)
+    val view = LocalView.current
+    val pendingCommand by model.pendingCommand.collectAsState()
+    var ledgerOpen by rememberSaveable { mutableStateOf(false) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var editorOpen by rememberSaveable { mutableStateOf(false) }
@@ -36,9 +44,19 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
     val openGoal: (String?) -> Unit = { goalId = it; goalOpen = true }
     LaunchedEffect(model) {
         model.messages.collect { message ->
+            if (message.closeEditor) editorOpen = false
+            message.feedback?.let { feedback ->
+                if (latestState.effects.haptics) view.performHapticFeedback(when (feedback) {
+                    SettlementFeedback.LEVEL_UP, SettlementFeedback.RECOVERED -> HapticFeedbackConstants.LONG_PRESS
+                    SettlementFeedback.LEVEL_DOWN, SettlementFeedback.UNDONE -> HapticFeedbackConstants.REJECT.takeIf { android.os.Build.VERSION.SDK_INT >= 30 } ?: HapticFeedbackConstants.LONG_PRESS
+                    else -> HapticFeedbackConstants.VIRTUAL_KEY
+                })
+                if (latestState.effects.sound) view.playSoundEffect(SoundEffectConstants.CLICK)
+            }
+
             val result = snackbar.showSnackbar(
-                presenter.present(message.request).text,
-                actionLabel = message.undoId?.let { presenter.text(ActionSemantic.UNDO_COMPLETION, semanticArguments {
+                latestPresenter.present(message.request).text,
+                actionLabel = message.undoId?.let { latestPresenter.text(ActionSemantic.UNDO_COMPLETION, semanticArguments {
                     put(SemanticParameters.UNDO_COMPLETION_LABEL, UndoCompletionLabel.SHORT)
                 }) },
                 withDismissAction = true, duration = SnackbarDuration.Long)
@@ -47,11 +65,12 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
     }
     LaunchedEffect(state.loading, state.loadError, state.world.player.onboarded) {
         if (!state.loading && !state.loadError && !state.world.player.onboarded) {
-            tab = 0; settings = false; editorOpen = false; detailId = null; goalOpen = false; noteOpen = false
+            tab = 0; settings = false; editorOpen = false; detailId = null; goalOpen = false; noteOpen = false; ledgerOpen = false
         }
     }
-    BackHandler(enabled = ready && tab != 0 && !settings && !editorOpen && !goalOpen && detailId == null && !noteOpen) { tab = 0 }
-    CompositionLocalProvider(LocalEditorSnackbar provides snackbar) {
+    BackHandler(enabled = ready && tab != 0 && !settings && !editorOpen && !goalOpen && detailId == null && !noteOpen && !ledgerOpen) { tab = 0 }
+    CompositionLocalProvider(LocalEditorSnackbar provides snackbar, LocalEarthState provides state,
+        LocalQuestPostpone provides model::postpone) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         Scaffold(
@@ -85,7 +104,7 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
             Row(Modifier.fillMaxSize().padding(padding)) {
                 if (ready && wide) PrimaryNavigation(tab, expanded = true) { tab = it }
                 Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
-                    Box(Modifier.widthIn(max = 880.dp).fillMaxSize()) {
+                    Box(Modifier.widthIn(max = 1200.dp).fillMaxSize()) {
                         when {
                             state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator(Modifier.semantics {
@@ -103,10 +122,10 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
                             !state.world.player.onboarded -> JoinScreen(state.busy, model::join)
                             else -> holder.SaveableStateProvider(tab) {
                                 when (tab) {
-                                    0 -> DashboardScreen(state, create, { detailId = it }, model::complete, { tab = 1 }, openGoal)
+                                    0 -> DashboardScreen(state, create, { detailId = it }, model::complete, { tab = 1 }, openGoal, { ledgerOpen = true })
                                     1 -> QuestsScreen(state, create, { detailId = it }, model::complete, openGoal, model::archiveGoal)
-                                    2 -> CharacterScreen(state)
-                                    3 -> JournalScreen(state, { noteOpen = true })
+                                    2 -> CharacterScreen(state, model, { ledgerOpen = true })
+                                    3 -> JournalScreen(state, { noteOpen = true }, { ledgerOpen = true })
                                 }
                             }
                         }
@@ -125,13 +144,23 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
     if (goalOpen && ready) GoalEditor(state.world.goals.firstOrNull { it.id == goalId }, state.busy,
         { goalOpen = false }) { title, description -> model.saveGoal(goalId, title, description) { goalOpen = false } }
     if (noteOpen && ready) NoteEditor(state.busy, { noteOpen = false }) { text -> model.addNote(text) { noteOpen = false } }
+    if (ledgerOpen && ready) ContractLedgerScreen(state, model, { ledgerOpen = false },
+        { ledgerOpen = false; detailId = it }, { ledgerOpen = false; create() })
     val detailedQuest = state.world.quests.firstOrNull { it.id == detailId }
     if (detailedQuest != null && ready) QuestDetail(detailedQuest, state,
         onDismiss = { detailId = null }, onEdit = { editId = detailedQuest.id; detailId = null; editorOpen = true },
         onComplete = { model.complete(detailedQuest.id) }, onUndo = model::undo,
         onPostpone = { model.postpone(detailedQuest.id) },
-        onState = { model.setQuestState(detailedQuest.id, it); detailId = null },
+        onState = { model.setQuestState(detailedQuest.id, it) },
+        onCalibrate = { model.calibrate(detailedQuest) },
+        onLedger = { detailId = null; ledgerOpen = true },
+        onWaive = model::waive,
     )
+    if (ready) pendingCommand?.disclosure?.let { disclosure ->
+        ContractConfirmation(disclosure, state.busy, model::confirmCommand, model::dismissCommand)
+    }
+    // The batch is topmost, even when a midnight boundary occurred in an editor.
+    if (ready && state.unacknowledged.isNotEmpty()) OverdueBatchDialog(state, model::acknowledgeAssessments)
     }
 }
 

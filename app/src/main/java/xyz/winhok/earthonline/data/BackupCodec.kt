@@ -79,7 +79,7 @@ object BackupCodec {
                 "signedAt" to c.signedAt, "closedAt" to c.closedAt,
                 "signedKind" to c.signedKind.name, "signedSkill" to c.signedSkill.name,
                 "extensionCount" to c.extensionCount, "fulfilledAt" to c.fulfilledAt,
-                "activeQuestId" to c.activeQuestId,
+                "activeQuestId" to c.activeQuestId, "titleSnapshot" to c.titleSnapshot,
             ) }),
             "contractRevisions" to JSONArray(snapshot.contractRevisions.map { r -> obj(
                 "id" to r.id, "contractId" to r.contractId, "sequence" to r.sequence,
@@ -110,6 +110,9 @@ object BackupCodec {
                 "targetDebtXp" to r.targetDebtXp, "openedAt" to r.openedAt,
                 "closedAt" to r.closedAt, "idempotencyKey" to r.idempotencyKey, "closedThroughAssessmentCount" to r.closedThroughAssessmentCount,
             ) }),
+            "settlementReceipts" to JSONArray(snapshot.settlementReceipts.map {
+                obj("consequenceId" to it.consequenceId, "acknowledgedAt" to it.acknowledgedAt)
+            }),
             "progressHistory" to obj("id" to snapshot.progressHistory.id, "highestLevel" to snapshot.progressHistory.highestLevel),
             "effects" to obj("id" to snapshot.effects.id, "sound" to snapshot.effects.sound, "haptics" to snapshot.effects.haptics, "reducedMotion" to snapshot.effects.reducedMotion),
             "presentationPreferences" to JSONArray(snapshot.presentationPreferences.map { obj("narrativeId" to it.narrativeId, "preferenceKey" to it.preferenceKey, "enabled" to it.enabled) }),
@@ -178,6 +181,7 @@ object BackupCodec {
                 if(version>=3) c.strictInt("extensionCount") else ContractMath.inferExtensions(c.strictLong("originalRewardXp"),c.strictLong("currentRewardXp")),
                 if(version>=3) c.nullLong("fulfilledAt") else if(c.strictString("status")=="FULFILLED") c.nullLong("closedAt") else null,
                 if(version>=3) c.nullString("activeQuestId") else if(c.strictString("status")=="ACTIVE") c.strictString("questId") else null,
+                if(version>=3) c.strictString("titleSnapshot") else "",
             ) },
             contractRevisions = data.getJSONArray("contractRevisions").mapObjects { r -> ContractRevisionEntity(
                 r.strictString("id"), r.strictString("contractId"), r.strictInt("sequence"),
@@ -212,6 +216,9 @@ object BackupCodec {
                 r.strictLong("targetDebtXp"), r.strictLong("openedAt"), r.nullLong("closedAt"),
                 r.strictString("idempotencyKey"), if(version>=3) r.strictInt("closedThroughAssessmentCount") else 0,
             ) },
+            settlementReceipts = if (version >= 3) data.getJSONArray("settlementReceipts").mapObjects {
+                SettlementReceiptEntity(it.strictString("consequenceId"), it.strictLong("acknowledgedAt"))
+            } else emptyList(),
             progressHistory = if(version>=3) data.getJSONObject("progressHistory").let { ProgressHistoryEntity(it.strictInt("id"),it.strictInt("highestLevel")) } else ProgressHistoryEntity(),
             effects = if(version>=3) data.getJSONObject("effects").let { EffectPreferencesEntity(it.strictInt("id"),it.strictBoolean("sound"),it.strictBoolean("haptics"),it.strictBoolean("reducedMotion")) } else EffectPreferencesEntity(),
             presentationPreferences = if(version>=3) data.getJSONArray("presentationPreferences").mapObjects { PresentationPreferenceEntity(it.strictString("narrativeId"),it.strictString("preferenceKey"),it.strictBoolean("enabled")) } else emptyList(),

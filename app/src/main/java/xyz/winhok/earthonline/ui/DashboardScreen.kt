@@ -3,7 +3,7 @@ package xyz.winhok.earthonline.ui
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,7 +43,7 @@ fun JoinScreen(busy: Boolean, join: (String, String) -> Unit) {
 
 @Composable
 fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> Unit, complete: (String) -> Unit,
-                    allQuests: () -> Unit, goal: (String?) -> Unit) {
+                    allQuests: () -> Unit, goal: (String?) -> Unit, ledger: () -> Unit = {}) {
     val presenter = LocalNarrativePresenter.current
     val cultivation = LocalNarrativeSystemId.current == NarrativeSystemId.CULTIVATION
     var minutes by rememberSaveable { mutableIntStateOf(25) }
@@ -53,14 +53,16 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
     val done = remember(world.completions) { world.completions.filter { it.revokedAt == null }.associateBy { it.id } }
     val active = world.quests.filter { QuestRules.available(it, day) && QuestRules.completionId(it, day) !in done }
     val recommendation = NextActionRules.rank(world, day, minutes, energy).firstOrNull()
-    val progress = ProgressRules.total(world.completions)
+    val progress = state.progress.current
     val todayDone = done.values.count { it.completedDay == day }
     val revisit = world.quests.filter { it.state == QuestState.ACTIVE && it.postponeCount >= 3 &&
         QuestRules.completionId(it, day) !in done }.take(3)
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 104.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        item {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val columns = if (maxWidth >= 700.dp) 2 else 1
+    LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize().testTag("dashboard-grid"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 104.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Card(colors = CardDefaults.cardColors(containerColor = if (cultivation) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -71,11 +73,11 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
                                 put(SemanticParameters.DAY, EpochDay(day))
                             }), style = MaterialTheme.typography.bodySmall)
                         }
-                        PlanetMark(Modifier.size(64.dp))
+                        PlanetMark(Modifier.size(96.dp))
                     }
                     Text(presenter.text(ScreenSemantic.DASHBOARD_LEVEL, semanticArguments {
                         put(SemanticParameters.LEVEL, LevelNumber(progress.level))
-                    }), style = MaterialTheme.typography.headlineSmall)
+                    }), style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.secondary)
                     LinearProgressIndicator(progress = { progress.fraction }, modifier = Modifier.fillMaxWidth())
                     Text(presenter.text(ScreenSemantic.DASHBOARD_PROGRESS, semanticArguments {
                         put(SemanticParameters.PROGRESS, LevelProgress(progress.intoLevel, progress.needed, todayDone))
@@ -84,11 +86,24 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
                 }
             }
         }
-        item { SectionTitle(
+        item { ContractBalance(state, ledger) }
+        val unsigned = world.quests.filter { it.kind != QuestKind.DAILY && it.dueDay != null &&
+            state.book.latest(it.id) == null && QuestRules.activeCompletion(it, world.completions, day) == null }
+        if (unsigned.isNotEmpty()) item {
+            EmptyState(presenter.text(ContractSemantic.CALIBRATE), presenter.text(ContractSemantic.UNSIGNED),
+                presenter.text(ActionSemantic.VIEW_QUEST), { open(unsigned.first().id) })
+        }
+        val route = state.book.routes.singleOrNull { it.status == "OPEN" }
+        if (route != null) item {
+            EmptyState(presenter.text(StateSemantic.RECOVERY_OPEN), presenter.text(ContractSemantic.RECOVERY_BODY),
+                presenter.text(ActionSemantic.OPEN_RECOVERY), ledger)
+        }
+        if (state.book.clocks.any { it.id.startsWith("clock-warning:") }) item { Text(presenter.text(ContractSemantic.CLOCK_WARNING)) }
+        item(span = { GridItemSpan(maxLineSpan) }) { SectionTitle(
             presenter.text(ScreenSemantic.DASHBOARD_PROMPT_TITLE),
             presenter.text(ScreenSemantic.DASHBOARD_PROMPT_BODY),
         ) }
-        item {
+        item(span = { GridItemSpan(maxLineSpan) }) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(15, 25, 45, 90).forEach { value -> FilterChip(selected = minutes == value,
@@ -142,10 +157,10 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
                 presenter.text(ActionSemantic.CREATE_GOAL), { goal(null) })
         }
         if (revisit.isNotEmpty()) {
-            item { SectionTitle(presenter.text(ScreenSemantic.REVISIT_TITLE), presenter.text(ScreenSemantic.REVISIT_BODY)) }
+            item(span = { GridItemSpan(maxLineSpan) }) { SectionTitle(presenter.text(ScreenSemantic.REVISIT_TITLE), presenter.text(ScreenSemantic.REVISIT_BODY)) }
             items(revisit, key = { "review-${it.id}" }) { q -> QuestCard(q, day, false, state.busy, { open(q.id) }, { complete(q.id) }) }
         }
-        item { SectionTitle(presenter.text(ScreenSemantic.EXECUTABLE_QUESTS, semanticArguments {
+        item(span = { GridItemSpan(maxLineSpan) }) { SectionTitle(presenter.text(ScreenSemantic.EXECUTABLE_QUESTS, semanticArguments {
             put(SemanticParameters.COUNT, CountValue(active.size))
         }), action = { TextButton(onClick = allQuests) { Text(presenter.text(ActionSemantic.VIEW_ALL)) } }) }
         if (active.isEmpty()) item { EmptyState(
@@ -154,5 +169,6 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
         items(active.sortedWith(compareByDescending<Quest> { it.priority }.thenBy { it.dueDay ?: Long.MAX_VALUE }).take(5), key = { it.id }) {
             q -> QuestCard(q, day, false, state.busy, { open(q.id) }, { complete(q.id) })
         }
+    }
     }
 }

@@ -58,7 +58,7 @@ object DeadlineEngine {
         private fun active(q: Quest) = book.active(q.id)
         private fun hasHistory(q: Quest) = world.completions.any { it.questId == q.id }
         private fun dated(d: QuestDraft) = d.kind != QuestKind.DAILY && d.dueDay != null
-        private fun currentReward(q: Quest): Int = book.latest(q.id)?.currentRewardXp?.toInt() ?: QuestRules.reward(q)
+        private fun currentReward(q: Quest): Int = (if (q.kind == QuestKind.DAILY) null else book.latest(q.id))?.currentRewardXp?.toInt() ?: QuestRules.reward(q)
         private fun draft(q: Quest) = QuestDraft(q.id, q.title, q.description, q.kind, q.difficulty, q.skill, q.priority,
             q.estimatedMinutes, q.dueDay, q.goalId)
         private fun postDraft(q: Quest): QuestDraft = draft(q).copy(dueDay = (q.dueDay ?: day) + 1)
@@ -88,7 +88,7 @@ object DeadlineEngine {
             val reward = QuestRules.reward(q).toLong()
             val c = TimeContract(id(), q.id, zoneId = world.player.zoneId, dueDay = due,
                 originalRewardXp = reward, currentRewardXp = reward, signedAt = now,
-                signedKind = q.kind, signedSkill = q.skill)
+                signedKind = q.kind, signedSkill = q.skill, titleSnapshot = q.title)
             put(c); revision(c, "SIGNED", due, reward)
         }
 
@@ -105,7 +105,8 @@ object DeadlineEngine {
             val later = c != null && d.dueDay != null && d.dueDay > c.dueDay
             val resign = c != null && (lockedChanged || (later && c.extensionCount >= 3))
             val abandon = c != null && (!dated(d) || resign)
-            val signing = dated(d) && (c == null || resign)
+            val unsignedDateChanged = q == null || command.calibrate || d.dueDay != q.dueDay
+            val signing = dated(d) && (resign || (c == null && unsignedDateChanged))
             if ((signing || later || (c != null && d.dueDay != c.dueDay)) && dated(d)) {
                 requireRule(d.dueDay!! >= today, RuleError.DATE)
             }
@@ -137,7 +138,7 @@ object DeadlineEngine {
             }
             is DeadlineCommand.Undo -> {
                 val completion = world.completions.firstOrNull { it.id == command.completionId && it.revokedAt == null }
-                val c = completion?.let { book.latest(it.questId) }
+                val c = completion?.takeIf { it.kind != QuestKind.DAILY }?.let { book.latest(it.questId) }
                 if (c != null && c.status == "FULFILLED" && now >= c.boundary())
                     ContractDisclosure(setOf(DisclosureKind.POST_DEADLINE_UNDO), c.questId, quest(c.questId).title,
                         immediateCost = c.originalRewardXp, reward = completion.xp.toLong(), zoneId = c.zoneId, contractId = c.id)
@@ -168,7 +169,8 @@ object DeadlineEngine {
             if (!closed) {
                 if (c == null) {
                     // Old unsigned tasks remain free until the player explicitly saves reviewed terms.
-                    if (dated(d) && q.state == QuestState.ACTIVE) sign(q)
+                    if (dated(d) && q.state == QuestState.ACTIVE &&
+                        (old == null || command.calibrate || d.dueDay != old.dueDay)) sign(q)
                 } else {
                     val lockedChanged = q.kind != c.signedKind || q.skill != c.signedSkill || QuestRules.reward(q).toLong() != c.originalRewardXp
                     val later = q.dueDay != null && q.dueDay > c.dueDay
@@ -203,34 +205,34 @@ object DeadlineEngine {
                     var value = QuestRules.complete(q, old, now, day)
                     if (old != null && old.revokedAt == null) return
                     requireRule(old != null || world.completions.size < QuestRules.MAX_COMPLETIONS, RuleError.LIMIT)
-                    val c = book.latest(q.id)
+                    val c = if (q.kind == QuestKind.DAILY) null else book.latest(q.id)
                     if (old == null && c != null) value = value.copy(xp = c.currentRewardXp.toInt(), skill = c.signedSkill)
                     world = world.copy(completions = world.completions.filterNot { it.id == key } + value)
                     if (c != null) put(c.copy(status = if (c.status == "ACTIVE") "FULFILLED" else c.status,
                         closedAt = c.closedAt ?: now, fulfilledAt = now))
                     event(EventKind.COMPLETED, value.title, q.id, value.xp)
-                    book = book.copy(nodes = book.nodes.map { if (it.questId == q.id && it.completedAt == null) it.copy(completedAt = now) else it })
+                    book = book.copy(nodes = book.nodes.map { if (it.questId == q.id && it.completedAt == null && book.routes.any { r -> r.id == it.routeId && r.status == "OPEN" }) it.copy(completedAt = now) else it })
                 }
                 is DeadlineCommand.Undo -> {
                     val c = world.completions.firstOrNull { it.id == command.completionId && it.revokedAt == null } ?: return
                     book.activeAllocations().filter { it.completionId == c.id }.forEach(::reverse)
                     world = world.copy(completions = world.completions.map { if (it.id == c.id) it.copy(revokedAt = now) else it })
-                    book.latest(c.questId)?.let { contract ->
+                    (if (c.kind == QuestKind.DAILY) null else book.latest(c.questId))?.let { contract ->
                         if (contract.status == "FULFILLED") {
                             val reopen = contract.copy(status = "ACTIVE", closedAt = null, fulfilledAt = null)
                             put(reopen)
                             if (now >= reopen.boundary()) assess(reopen, "OVERDUE")
                         } else put(contract.copy(fulfilledAt = null))
                     }
-                    book = book.copy(nodes = book.nodes.map { if (it.questId == c.questId) it.copy(completedAt = null) else it })
+                    book = book.copy(nodes = book.nodes.map { if (it.questId == c.questId && it.completedAt == c.completedAt && book.routes.any { r -> r.id == it.routeId && r.status == "OPEN" }) it.copy(completedAt = null) else it })
                     event(EventKind.UNDONE, c.title, c.questId, -c.xp)
                 }
                 is DeadlineCommand.Postpone -> {
                     val old = quest(command.questId)
                     requireRule(old.state == QuestState.ACTIVE, RuleError.INACTIVE)
                     requireRule(done(old) == null, RuleError.NOT_AVAILABLE)
-                    val until = maxOf(day, old.snoozedUntilDay ?: day,
-                        if (old.kind == QuestKind.DAILY) old.dueDay ?: day else day) + 1
+                    val until = if (old.kind == QuestKind.DAILY) day + 1
+                        else maxOf(day, old.snoozedUntilDay ?: day) + 1
                     requireRule(until <= QuestRules.MAX_DAY && old.postponeCount < 1_000_000, RuleError.LIMIT)
                     if (active(old) != null) save(DeadlineCommand.Save(postDraft(old), old.id))
                     put(quest(old.id).copy(snoozedUntilDay = until, postponeCount = old.postponeCount + 1, updatedAt = now))
@@ -262,7 +264,9 @@ object DeadlineEngine {
                     val route = book.routes.singleOrNull { it.status == "OPEN" } ?: throw RuleViolation(RuleError.NOT_AVAILABLE)
                     requireRule(command.questIds.distinct().size == command.questIds.size, RuleError.NOT_AVAILABLE)
                     val quests = command.questIds.map(::quest)
-                    requireRule(quests.all { QuestRules.available(it, day) && done(it) == null }, RuleError.NOT_AVAILABLE)
+                    requireRule(quests.all { QuestRules.available(it, day) && done(it) == null &&
+                        book.nodes.none { node -> node.routeId == route.id && node.questId == it.id && node.completedAt != null }
+                    }, RuleError.NOT_AVAILABLE)
                     requireRule(quests.sumOf { currentReward(it).toLong() } >= book.progress(world).debtXp, RuleError.NOT_AVAILABLE)
                     book = book.copy(nodes = book.nodes.filterNot { it.routeId == route.id && it.completedAt == null } +
                         quests.mapIndexed { index, q -> RecoveryNode(route.id, q.id, index + (book.nodes.maxOfOrNull { it.position } ?: 0) + 1, now) })

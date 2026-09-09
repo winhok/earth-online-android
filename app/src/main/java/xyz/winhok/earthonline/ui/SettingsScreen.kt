@@ -19,6 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
@@ -100,6 +102,19 @@ fun SettingsScreen(model: EarthViewModel, state: EarthUiState, onDismiss: () -> 
                     enabled = !state.busy,
                     onSelect = model::switchNarrative,
                 )
+            }
+            item {
+                HorizontalDivider()
+                SectionTitle(presenter.text(ContractSemantic.EFFECTS), presenter.text(ContractSemantic.EFFECTS_NOTICE))
+                EffectToggle(presenter.text(ContractSemantic.SOUND), state.effects.sound, !state.busy) {
+                    model.saveEffects(it, state.effects.haptics, state.effects.reducedMotion)
+                }
+                EffectToggle(presenter.text(ContractSemantic.HAPTICS), state.effects.haptics, !state.busy) {
+                    model.saveEffects(state.effects.sound, it, state.effects.reducedMotion)
+                }
+                EffectToggle(presenter.text(ContractSemantic.REDUCED_MOTION), state.effects.reducedMotion, !state.busy) {
+                    model.saveEffects(state.effects.sound, state.effects.haptics, it)
+                }
             }
             item { HorizontalDivider(); SectionTitle(
                 presenter.text(ScreenSemantic.REMINDERS_TITLE),
@@ -233,4 +248,13 @@ fun RestorePreviewDialog(
             TextButton(onClick = onDismiss, enabled = !busy) { Text(presenter.text(ActionSemantic.CANCEL)) }
         },
     )
+}
+
+@Composable
+private fun EffectToggle(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.weight(1f).padding(end = 12.dp))
+        Switch(checked = checked, enabled = enabled, onCheckedChange = onChange,
+            modifier = Modifier.semantics { contentDescription = label })
+    }
 }

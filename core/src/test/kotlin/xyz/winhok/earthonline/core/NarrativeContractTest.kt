@@ -347,6 +347,7 @@ class NarrativeContractTest {
             ContractParameters.SUMMARY to EffectiveProgress(ProgressRules.fromXp(20),100,0,2),
             ContractParameters.SELECTION to RecoverySelectionData(100,75,4),
             ContractParameters.SETTLEMENT to SettlementData(25,20,2,1),
+            ContractParameters.BATCH to OverdueBatchData(3,75,2,1),
             ContractParameters.LEDGER to LedgerLine("l","OVERDUE","User title",25,1000,"c","UTC"),
             SemanticParameters.XP to XpAmount(25),
             SemanticParameters.PLAYER_NAME to OpaqueText("玩家"),

@@ -19,7 +19,7 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
         "player", "quests", "goals", "completions", "journal", "contracts", "contract_revisions",
         "consequence_events", "consequence_adjustments", "repayment_allocations", "clock_boundaries",
         "recovery_routes", "recovery_nodes", "progress_history", "narrative_preferences",
-        "effect_preferences", "presentation_preferences", emitInitialState = true,
+        "effect_preferences", "presentation_preferences", "settlement_receipts", emitInitialState = true,
     ).map { reconciledSnapshot() }
 
     fun observe(): Flow<World> = db.invalidationTracker.createFlow(
@@ -56,6 +56,7 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
         progressHistory = dao.progressHistory() ?: ProgressHistoryEntity(),
         effects = dao.effects() ?: EffectPreferencesEntity(),
         presentationPreferences = dao.presentationPreferences(),
+        settlementReceipts = dao.settlementReceipts(),
     )
     private suspend fun player(): Player = dao.player()?.value ?: throw RuleViolation(RuleError.PROFILE)
     private suspend fun quest(id: String): Quest = dao.quest(id)?.value ?: throw RuleViolation(RuleError.MISSING_QUEST)
@@ -160,6 +161,17 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
     suspend fun postpone(questId: String, accepted: ContractDisclosure? = null) { execute(DeadlineCommand.Postpone(questId),accepted) }
     suspend fun setQuestState(questId: String, state: QuestState, accepted: ContractDisclosure? = null) { execute(DeadlineCommand.SetState(questId,state),accepted) }
 
+    suspend fun acknowledgeAssessments(ids: List<String>) = db.withTransaction {
+        val current = readBackupSnapshot()
+        val liabilities = current.consequences.associateBy { it.id }
+        ensure(ids.distinct().size == ids.size && ids.all { liabilities[it]?.kind == "OVERDUE" }, RuleError.NOT_AVAILABLE)
+        val acknowledgedAt = current.deadlineState().book.effectiveNow(clock.millis())
+        val receipts = ids.map { SettlementReceiptEntity(it, acknowledgedAt) }
+        BackupSnapshotBudget.requireFits(current.copy(settlementReceipts =
+            (current.settlementReceipts + receipts).distinctBy { it.consequenceId }))
+        receipts.forEach { dao.putSettlementReceipt(it) }
+    }
+
     suspend fun saveEffects(sound: Boolean, haptics: Boolean, reducedMotion: Boolean) = db.withTransaction {
         player()
         dao.putEffects(EffectPreferencesEntity(sound=sound,haptics=haptics,reducedMotion=reducedMotion))
@@ -227,11 +239,13 @@ class WorldRepository(private val db: EarthDatabase, private val clock: Clock = 
             dao.putProgressHistory(snapshot.progressHistory)
             dao.putEffects(snapshot.effects)
             snapshot.presentationPreferences.forEach { dao.putPresentationPreference(it) }
+            snapshot.settlementReceipts.forEach { dao.putSettlementReceipt(it) }
         }
     }
 
     suspend fun reset() = db.withTransaction { clearTables() }
     private suspend fun clearTables() {
+        dao.clearSettlementReceipts()
         dao.clearPresentationPreferences()
         dao.clearEffects()
         dao.clearProgressHistory()

@@ -20,6 +20,7 @@ data class TimeContract(
     val signedSkill: Skill = Skill.DISCIPLINE,
     val extensionCount: Int = 0,
     val fulfilledAt: Long? = null,
+    val titleSnapshot: String = "",
 ) : ContractRecord {
     fun boundary(): Long = LocalDate.ofEpochDay(dueDay).plusDays(1)
         .atStartOfDay(ZoneId.of(zoneId)).toInstant().toEpochMilli()

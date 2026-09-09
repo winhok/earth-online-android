@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import xyz.winhok.earthonline.core.*
 
 @Composable
-fun JournalScreen(state: EarthUiState, note: () -> Unit) {
+fun JournalScreen(state: EarthUiState, note: () -> Unit, ledger: () -> Unit = {}) {
     val presenter = LocalNarrativePresenter.current
     var notesOnly by rememberSaveable { mutableStateOf(false) }
     val events = state.world.events.filter { !notesOnly || it.kind == EventKind.NOTE }
@@ -22,6 +22,13 @@ fun JournalScreen(state: EarthUiState, note: () -> Unit) {
             presenter.text(ScreenSemantic.JOURNAL_TITLE),
             presenter.text(ScreenSemantic.JOURNAL_BODY),
         ) }
+        item { OutlinedButton(onClick = ledger) { Text(presenter.text(ContractSemantic.LEDGER_TITLE)) } }
+        if (!notesOnly) items(state.deadline.ledgerLines().take(12), key = { "structured-${it.id}" }) { line ->
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Text(presenter.text(ContractSemantic.LEDGER_ENTRY, semanticArguments { put(ContractParameters.LEDGER, line) }),
+                    Modifier.padding(16.dp))
+            }
+        }
         item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = !notesOnly, onClick = { notesOnly = false }, label = {
                 Text(presenter.text(ScreenSemantic.ALL_EVENTS))
