@@ -1,0 +1,192 @@
+name: Publish recovered v1.5 after complete acceptance
+on:
+  push:
+    branches: ['release/1.5.0-completion']
+    paths: ['.github/workflows/publish-recovered-v15.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: earth-v15-recovered-publication
+  cancel-in-progress: false
+env:
+  BINARY_SOURCE: 9116c10b5694fab87f9ac5ba3d18bc959f121229
+  VERSION_NAME: '1.5.0'
+  VERSION_CODE: '2'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check PyYAML==6.0.2
+      - name: Wait for the exact recovery test snapshot, never an unrelated green run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, pathlib, subprocess, time
+          def api(path):
+              return json.loads(subprocess.check_output(['gh','api',path],text=True))
+          gate_source=subprocess.check_output(['git','log','-1','--format=%H','--','.github/workflows/resume-v15-release-gates.yml'],text=True).strip()
+          assert gate_source, 'Recovery workflow is not present in this history'
+          subprocess.run(['git','merge-base','--is-ancestor',gate_source,'HEAD'],check=True)
+          subprocess.run(['git','diff','--exit-code',gate_source,'HEAD','--','app','core','gradle','scripts','build.gradle.kts','settings.gradle.kts','gradle.properties'],check=True)
+          deadline=time.monotonic()+3000
+          selected=None
+          while time.monotonic()<deadline:
+              runs=api('repos/winhok/earth-online-android/actions/workflows/resume-v15-release-gates.yml/runs?per_page=100')['workflow_runs']
+              matches=[r for r in runs if r['head_sha']==gate_source and r['head_branch']=='release/1.5.0-completion']
+              if matches:
+                  selected=max(matches,key=lambda r:(r['id'],r.get('run_attempt',1)))
+                  print('Recovery run',selected['id'],selected['status'],selected.get('conclusion'),flush=True)
+                  if selected['status']=='completed':
+                      assert selected.get('conclusion')=='success', 'Recovery acceptance failed; publication remains blocked'
+                      break
+              time.sleep(20)
+          else:
+              raise RuntimeError('Recovery acceptance did not finish within the bounded wait')
+          root=pathlib.Path('publication-input'); root.mkdir(exist_ok=True)
+          (root/'gate.json').write_text(json.dumps({'gate_run':selected['id'],'gate_source':gate_source,'publication_source':os.environ['GITHUB_SHA'],'binary_source':os.environ['BINARY_SOURCE']},indent=2))
+          subprocess.run(['gh','run','download',str(selected['id']),'--repo','winhok/earth-online-android','--pattern','v15-release-api-*','--dir','publication-input/devices'],check=True)
+          subprocess.run(['gh','run','download',str(selected['id']),'--repo','winhok/earth-online-android','--name','v15-recovered-gate-summary','--dir','publication-input/summary'],check=True)
+          PY
+      - name: Recover packages and run the repository's original signed-release evidence validator
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/winhok/earth-online-android/actions/artifacts/10124847156/zip > "$RUNNER_TEMP/v15-signed.zip"
+          echo "5592f5f51351e2dd88b81b212b99699d93d0facd792e5cbca41fb135d308f865  $RUNNER_TEMP/v15-signed.zip" | sha256sum --check
+          python - <<'PY'
+          import hashlib, json, os, pathlib, re, shutil, subprocess, tarfile, zipfile, yaml
+          gate=json.loads(pathlib.Path('publication-input/gate.json').read_text())
+          subprocess.run(['git','diff','--exit-code',gate['binary_source'],'HEAD','--','app/src/main','core/src/main','app/build.gradle.kts','core/build.gradle.kts','app/proguard-rules.pro','build.gradle.kts','settings.gradle.kts','gradle','gradle.properties'],check=True)
+          config=yaml.safe_load(pathlib.Path('.github/workflows/publish-v15.yml').read_text())
+          job=config['jobs']['publish']
+          downloads=[s.get('with',{}) for s in job['steps'] if 'actions/download-artifact@' in s.get('uses','')]
+          package_specs=[s for s in downloads if s.get('name')=='v15-signed-packages']
+          device_specs=[s for s in downloads if s.get('pattern') and 'api-' in s['pattern']]
+          assert len(package_specs)==1 and len(device_specs)==1, 'Cannot resolve the existing evidence validator layout'
+          def safe_path(value):
+              p=pathlib.Path(value)
+              assert not p.is_absolute() and '..' not in p.parts and '${{' not in str(p) and str(p) not in ('.','')
+              return p
+          packages=safe_path(package_specs[0]['path']); evidence=safe_path(device_specs[0]['path'])
+          packages.mkdir(parents=True,exist_ok=True)
+          with zipfile.ZipFile(pathlib.Path(os.environ['RUNNER_TEMP'])/'v15-signed.zip') as archive:
+              for item in archive.infolist():
+                  p=pathlib.PurePosixPath(item.filename)
+                  assert not p.is_absolute() and '..' not in p.parts and (item.external_attr >> 16) & 0o170000 != 0o120000
+                  assert p.suffix.lower() not in ('.jks','.p12','.pfx','.pem','.key') and p.name!='credentials.json'
+              archive.extractall(packages)
+          shutil.copytree('publication-input/devices',evidence,dirs_exist_ok=True)
+          apk=list(packages.rglob('earth-online-1.5.0.apk')); aab=list(packages.rglob('earth-online-1.5.0.aab'))
+          assert len(apk)==1 and len(aab)==1
+          apk_sha=hashlib.sha256(apk[0].read_bytes()).hexdigest()
+          summary_files=list(pathlib.Path('publication-input/summary').rglob('device-summary.json'))
+          assert len(summary_files)==1
+          summary=json.loads(summary_files[0].read_text())
+          assert summary['all_passed'] is True
+          assert {d['api'] for d in summary['devices']}=={26,29,35,36}
+          for device in summary['devices']:
+              p=device['provenance']
+              assert p['apk_sha256']==apk_sha and p['test_source']==gate['gate_source'] and p['binary_source']==gate['binary_source']
+          validators=[]
+          for step in job['steps']:
+              code=step.get('run','')
+              if re.search(r'python(?:3)?\s+[^\n]*verify[^\n]*\.py',code) and 'gh release' not in code:
+                  validators.append(code)
+          assert validators, 'No original signed-APK evidence validator found; refusing to replace it with weaker checks'
+          environment=dict(os.environ)
+          environment.pop('GH_TOKEN',None); environment.pop('GITHUB_TOKEN',None)
+          environment['GITHUB_SHA']=gate['binary_source']
+          for command in validators:
+              command=command.replace('${{ github.sha }}',gate['binary_source'])
+              assert '${{' not in command, 'Unresolved validator expression requires review'
+              subprocess.run(['bash','-euo','pipefail','-c',command],env=environment,check=True)
+          notes=pathlib.Path('docs/RELEASE_1.5.0.md')
+          assert notes.is_file(), 'Missing reviewed version-specific release notes'
+          ready=pathlib.Path('release-ready'); ready.mkdir(exist_ok=True)
+          shutil.copy2(apk[0],ready/apk[0].name); shutil.copy2(aab[0],ready/aab[0].name)
+          for name in ('acceptance-summary.json','apk-signature-verification.txt','apk-manifest-summary.txt','app-signing-certificate.crt','certificate-sha256.txt','source-commit.txt'):
+              found=list(packages.rglob(name))
+              if found:
+                  assert len(found)==1
+                  shutil.copy2(found[0],ready/name)
+          assert (ready/'acceptance-summary.json').is_file(), 'Original validator did not produce its acceptance summary'
+          (ready/'recovery-provenance.json').write_text(json.dumps({**gate,'apk_sha256':apk_sha,'devices':summary['devices']},indent=2))
+          with tarfile.open(ready/'device-acceptance-evidence.tar.gz','w:gz') as archive:
+              archive.add(evidence,arcname='devices')
+          (ready/'RELEASE_NOTES.md').write_text(notes.read_text()+'\n\n## 本次恢复验收溯源\n\n签名包构建源码：`'+gate['binary_source']+'`。验收源码：`'+gate['gate_source']+'`。两者生产代码和构建配置已逐项比较一致；没有重签名或替换受测 APK。恢复验收运行：`'+str(gate['gate_run'])+'`。\n')
+          lines=[]
+          for p in sorted(ready.iterdir()):
+              if p.is_file(): lines.append(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name)
+          (ready/'SHA256SUMS.txt').write_text('\n'.join(lines)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v15-release-ready
+          path: release-ready/
+          if-no-files-found: error
+          retention-days: 90
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: v15-release-ready
+          path: release-ready
+      - name: Verify handoff, fast-forward without overwriting user work, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          (cd release-ready && sha256sum --check SHA256SUMS.txt)
+          test "$(python3 -c 'import json; print(json.load(open("release-ready/recovery-provenance.json"))["publication_source"])')" = "$GITHUB_SHA"
+          test "$(gh api repos/winhok/earth-online-android/pulls/13 --jq '.head.sha')" = "$GITHUB_SHA"
+          gh auth setup-git
+          git fetch origin main
+          git merge-base --is-ancestor origin/main "$GITHUB_SHA"
+          if test "$(gh pr view 13 --repo winhok/earth-online-android --json isDraft --jq '.isDraft')" = true; then
+            gh pr ready 13 --repo winhok/earth-online-android
+          fi
+          gh api --method PATCH repos/winhok/earth-online-android/git/refs/heads/main -f "sha=$GITHUB_SHA" -F force=false
+          if gh api repos/winhok/earth-online-android/releases/tags/v1.5.0 > "$RUNNER_TEMP/existing-release.json" 2>/dev/null; then
+            EXPECTED="$(sha256sum release-ready/earth-online-1.5.0.apk | cut -d' ' -f1)"
+            export EXPECTED
+            python3 - <<'PY'
+          import json,os
+          data=json.load(open(os.environ['RUNNER_TEMP']+'/existing-release.json'))
+          assert not data['draft'] and not data['prerelease']
+          assets=[a for a in data['assets'] if a['name']=='earth-online-1.5.0.apk']
+          assert len(assets)==1 and assets[0].get('digest')=='sha256:'+os.environ['EXPECTED'], 'Existing release differs; refusing overwrite'
+          print('The identical verified release already exists; left unchanged.')
+          PY
+          else
+            if gh api repos/winhok/earth-online-android/git/ref/tags/v1.5.0 > "$RUNNER_TEMP/existing-tag.json" 2>/dev/null; then
+              test "$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/existing-tag.json"))["object"]["sha"])')" = "$BINARY_SOURCE"
+            fi
+            gh release create v1.5.0 --repo winhok/earth-online-android --target "$BINARY_SOURCE" --title '地球 Online 1.5.0 · 时限契约与修仙叙事' --notes-file release-ready/RELEASE_NOTES.md release-ready/earth-online-1.5.0.apk release-ready/earth-online-1.5.0.aab release-ready/SHA256SUMS.txt release-ready/acceptance-summary.json release-ready/recovery-provenance.json release-ready/device-acceptance-evidence.tar.gz
+          fi
+          gh api repos/winhok/earth-online-android/releases/tags/v1.5.0 --jq '{url: .html_url, tag: .tag_name, draft: .draft, prerelease: .prerelease, assets: [.assets[] | {name, digest, size}]}'
