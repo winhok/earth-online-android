@@ -25,6 +25,7 @@ import kotlin.math.roundToInt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -121,7 +122,7 @@ fun QuestCard(quest: Quest, day: Long, done: Boolean, busy: Boolean,
             shape = if (cultivation) CutCornerShape(topEnd = 16.dp, bottomStart = 10.dp) else RoundedCornerShape(16.dp),
             border = BorderStroke(1.dp, if (cultivation) MaterialTheme.colorScheme.secondary.copy(alpha = .65f) else MaterialTheme.colorScheme.outlineVariant),
             colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().testTag("quest-card-${quest.id}")
                 .offset { IntOffset(if (reduced) 0 else (drag * .18f).roundToInt(), 0) }
                 .semantics {
                     customActions = buildList {
@@ -214,7 +215,7 @@ fun EditorFrame(title: String, busy: Boolean, canSave: Boolean, onDismiss: () ->
         }
         Surface(Modifier.fillMaxSize()) {
             Scaffold(
-                snackbarHost = { snackbar?.let { SnackbarHost(it) } },
+                snackbarHost = { snackbar?.let { SettlementSnackbarHost(it) } },
                 topBar = {
                     TopAppBar(title = { Text(title) }, navigationIcon = {
                         IconButton(onClick = { finishEditing(onDismiss) }, enabled = !busy) {

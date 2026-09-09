@@ -38,6 +38,7 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
     var goalId by rememberSaveable { mutableStateOf<String?>(null) }
     var noteOpen by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
+    var feedback by remember { mutableStateOf<SettlementFeedback?>(null) }
     val holder = rememberSaveableStateHolder()
     val ready = !state.loading && !state.loadError && state.world.player.onboarded
     val create: () -> Unit = { editId = null; editorOpen = true }
@@ -45,10 +46,11 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
     LaunchedEffect(model) {
         model.messages.collect { message ->
             if (message.closeEditor) editorOpen = false
+            feedback = message.feedback
             message.feedback?.let { feedback ->
                 if (latestState.effects.haptics) view.performHapticFeedback(when (feedback) {
                     SettlementFeedback.LEVEL_UP, SettlementFeedback.RECOVERED -> HapticFeedbackConstants.LONG_PRESS
-                    SettlementFeedback.LEVEL_DOWN, SettlementFeedback.UNDONE -> HapticFeedbackConstants.REJECT.takeIf { android.os.Build.VERSION.SDK_INT >= 30 } ?: HapticFeedbackConstants.LONG_PRESS
+                    SettlementFeedback.LEVEL_DOWN, SettlementFeedback.UNDONE -> if (android.os.Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
                     else -> HapticFeedbackConstants.VIRTUAL_KEY
                 })
                 if (latestState.effects.sound) view.playSoundEffect(SoundEffectConstants.CLICK)
@@ -70,17 +72,20 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
     }
     BackHandler(enabled = ready && tab != 0 && !settings && !editorOpen && !goalOpen && detailId == null && !noteOpen && !ledgerOpen) { tab = 0 }
     CompositionLocalProvider(LocalEditorSnackbar provides snackbar, LocalEarthState provides state,
-        LocalQuestPostpone provides model::postpone) {
+        LocalQuestPostpone provides model::postpone, LocalSettlementFeedback provides feedback) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         Scaffold(
             topBar = { if (ready) TopAppBar(title = {
                 Column {
                     Text(presenter.text(ScreenSemantic.APP_NAME), style = MaterialTheme.typography.titleLarge)
-                    Text(state.world.player.server, style = MaterialTheme.typography.labelSmall,
+                    Text(state.world.player.server, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }, actions = {
+                IconButton(onClick = { ledgerOpen = true }, enabled = !state.busy, modifier = Modifier.testTag("ledger-navigation")) {
+                    Icon(Icons.Default.AccountBalanceWallet, presenter.text(ActionSemantic.VIEW_DEBT))
+                }
                 IconButton(onClick = { settings = true }, enabled = !state.busy) {
                     Icon(Icons.Default.Settings, presenter.text(ActionSemantic.OPEN_SETTINGS))
                 }
@@ -99,7 +104,7 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
                     Icon(Icons.Default.EditNote, presenter.text(ActionSemantic.WRITE_NOTE))
                 }
             },
-            snackbarHost = { SnackbarHost(snackbar) },
+            snackbarHost = { SettlementSnackbarHost(snackbar) },
         ) { padding ->
             Row(Modifier.fillMaxSize().padding(padding)) {
                 if (ready && wide) PrimaryNavigation(tab, expanded = true) { tab = it }

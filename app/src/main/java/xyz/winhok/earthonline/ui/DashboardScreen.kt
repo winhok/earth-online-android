@@ -58,12 +58,12 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
     val revisit = world.quests.filter { it.state == QuestState.ACTIVE && it.postponeCount >= 3 &&
         QuestRules.completionId(it, day) !in done }.take(3)
     BoxWithConstraints(Modifier.fillMaxSize()) {
-    val columns = if (maxWidth >= 700.dp) 2 else 1
+    val columns = if (maxWidth >= 620.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.5f) 2 else 1
     LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize().testTag("dashboard-grid"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 104.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        verticalArrangement = Arrangement.spacedBy(14.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Card(colors = CardDefaults.cardColors(containerColor = if (cultivation) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.primaryContainer)) {
-                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(presenter.text(ScreenSemantic.PLAYER_WELCOME, semanticArguments {
@@ -73,7 +73,7 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
                                 put(SemanticParameters.DAY, EpochDay(day))
                             }), style = MaterialTheme.typography.bodySmall)
                         }
-                        PlanetMark(Modifier.size(96.dp))
+                        PlanetMark(Modifier.size(48.dp))
                     }
                     Text(presenter.text(ScreenSemantic.DASHBOARD_LEVEL, semanticArguments {
                         put(SemanticParameters.LEVEL, LevelNumber(progress.level))
@@ -83,6 +83,58 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
                         put(SemanticParameters.PROGRESS, LevelProgress(progress.intoLevel, progress.needed, todayDone))
                     }),
                         style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+        item(span = { GridItemSpan(maxLineSpan) }) { SectionTitle(
+            presenter.text(ScreenSemantic.DASHBOARD_PROMPT_TITLE),
+        ) }
+        item {
+            if (recommendation == null) EmptyState(
+                presenter.text(ScreenSemantic.RECOMMENDATION_EMPTY_TITLE),
+                presenter.text(ScreenSemantic.RECOMMENDATION_EMPTY_BODY),
+                presenter.text(ActionSemantic.CREATE_QUEST),
+                create,
+            )
+            else Card(
+                modifier = if (cultivation) Modifier.fillMaxWidth() else Modifier,
+                colors = CardDefaults.cardColors(containerColor = if (cultivation) {
+                    MaterialTheme.colorScheme.surfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.secondaryContainer
+                }),
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(presenter.text(ScreenSemantic.NEXT_QUEST), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text(recommendation.quest.title, style = MaterialTheme.typography.headlineSmall)
+                    Text(presenter.questMeta(recommendation.quest, day), style = MaterialTheme.typography.bodyMedium)
+                    Text(presenter.text(ScreenSemantic.RECOMMENDATION_REASONS, semanticArguments {
+                        put(SemanticParameters.RECOMMENDATION_REASONS, RecommendationReasons(recommendation.reasons))
+                    }), style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(onClick = { open(recommendation.quest.id) }, modifier = Modifier.heightIn(min = 48.dp).testTag("next-quest-action")) { Text(presenter.text(ActionSemantic.VIEW_QUEST)) }
+                        TextButton(onClick = { complete(recommendation.quest.id) }, enabled = !state.busy) {
+                            Text(presenter.text(ActionSemantic.COMPLETE_QUEST, semanticArguments {
+                                put(SemanticParameters.COMPLETE_QUEST_LABEL,
+                                    CompleteQuestLabel(CompleteQuestLabelStyle.SHORT))
+                            }))
+                        }
+                    }
+                    Text(presenter.text(ScreenSemantic.RECOMMENDATION_NOTICE), style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(15, 25, 45, 90).forEach { value -> FilterChip(selected = minutes == value,
+                        onClick = { minutes = value }, label = { Text(presenter.text(ScreenSemantic.MINUTE_OPTION,
+                            semanticArguments { put(SemanticParameters.MINUTES, CountValue(value)) })) }) }
+                }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(ScreenSemantic.ENERGY_LOW, ScreenSemantic.ENERGY_MEDIUM, ScreenSemantic.ENERGY_HIGH)
+                        .forEachIndexed { index, key -> FilterChip(selected = energy == index + 1,
+                            onClick = { energy = index + 1 }, label = { Text(presenter.text(key)) }) }
                 }
             }
         }
@@ -99,59 +151,6 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
                 presenter.text(ActionSemantic.OPEN_RECOVERY), ledger)
         }
         if (state.book.clocks.any { it.id.startsWith("clock-warning:") }) item { Text(presenter.text(ContractSemantic.CLOCK_WARNING)) }
-        item(span = { GridItemSpan(maxLineSpan) }) { SectionTitle(
-            presenter.text(ScreenSemantic.DASHBOARD_PROMPT_TITLE),
-            presenter.text(ScreenSemantic.DASHBOARD_PROMPT_BODY),
-        ) }
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(15, 25, 45, 90).forEach { value -> FilterChip(selected = minutes == value,
-                        onClick = { minutes = value }, label = { Text(presenter.text(ScreenSemantic.MINUTE_OPTION,
-                            semanticArguments { put(SemanticParameters.MINUTES, CountValue(value)) })) }) }
-                }
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(ScreenSemantic.ENERGY_LOW, ScreenSemantic.ENERGY_MEDIUM, ScreenSemantic.ENERGY_HIGH)
-                        .forEachIndexed { index, key -> FilterChip(selected = energy == index + 1,
-                            onClick = { energy = index + 1 }, label = { Text(presenter.text(key)) }) }
-                }
-            }
-        }
-        item {
-            if (recommendation == null) EmptyState(
-                presenter.text(ScreenSemantic.RECOMMENDATION_EMPTY_TITLE),
-                presenter.text(ScreenSemantic.RECOMMENDATION_EMPTY_BODY),
-                presenter.text(ActionSemantic.CREATE_QUEST),
-                create,
-            )
-            else Card(
-                modifier = if (cultivation) Modifier.fillMaxWidth() else Modifier,
-                colors = CardDefaults.cardColors(containerColor = if (cultivation) {
-                    MaterialTheme.colorScheme.surfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.secondaryContainer
-                }),
-            ) {
-                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(presenter.text(ScreenSemantic.NEXT_QUEST), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                    Text(recommendation.quest.title, style = MaterialTheme.typography.headlineSmall)
-                    Text(presenter.questMeta(recommendation.quest, day), style = MaterialTheme.typography.bodyMedium)
-                    Text(presenter.text(ScreenSemantic.RECOMMENDATION_REASONS, semanticArguments {
-                        put(SemanticParameters.RECOMMENDATION_REASONS, RecommendationReasons(recommendation.reasons))
-                    }), style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { open(recommendation.quest.id) }) { Text(presenter.text(ActionSemantic.VIEW_QUEST)) }
-                        TextButton(onClick = { complete(recommendation.quest.id) }, enabled = !state.busy) {
-                            Text(presenter.text(ActionSemantic.COMPLETE_QUEST, semanticArguments {
-                                put(SemanticParameters.COMPLETE_QUEST_LABEL,
-                                    CompleteQuestLabel(CompleteQuestLabelStyle.SHORT))
-                            }))
-                        }
-                    }
-                    Text(presenter.text(ScreenSemantic.RECOMMENDATION_NOTICE), style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
         if (world.goals.none { !it.archived }) item {
             EmptyState(presenter.text(ScreenSemantic.GOAL_EMPTY_TITLE), presenter.text(ScreenSemantic.GOAL_EMPTY_BODY),
                 presenter.text(ActionSemantic.CREATE_GOAL), { goal(null) })

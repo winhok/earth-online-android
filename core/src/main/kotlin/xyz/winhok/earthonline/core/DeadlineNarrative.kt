@@ -25,6 +25,8 @@ enum class ContractSemantic(override val wireId: String): SemanticKey {
     RECOVERY_PENDING("screen.recovery-pending"), STORY_FIRST_ACTION("screen.story-first-action"),
     STORY_FIRST_PROMISE("screen.story-first-promise"), STORY_RETURN("screen.story-return"),
     RETURN_TO_TASKS("screen.return-to-tasks"), GESTURE_HINT("screen.gesture-hint"),
+    FEEDBACK_COMPLETE("screen.feedback-complete"), FEEDBACK_UP("screen.feedback-up"), FEEDBACK_DOWN("screen.feedback-down"),
+    FEEDBACK_REPAID("screen.feedback-repaid"), FEEDBACK_RECOVERED("screen.feedback-recovered"), FEEDBACK_UNDONE("screen.feedback-undone"), FEEDBACK_ACHIEVEMENT("screen.feedback-achievement"),
     CONTRACT_HISTORY("screen.contract-history"),
     ;
     override val category = SemanticCategory.SCREEN
@@ -90,6 +92,13 @@ internal object DeadlineNarrative {
             ContractSemantic.EXPAND to text("展开完整明细"), ContractSemantic.COLLAPSE to text("收起明细"),
             ContractSemantic.RECOVERY_PENDING to text("债务出现后可以继续完成真实任务偿还。达到重复失约或整级债务门槛时，系统开启路线；不会强加虚构任务。"),
             ContractSemantic.RETURN_TO_TASKS to text("返回任务，选择下一步"),
+            ContractSemantic.FEEDBACK_ACHIEVEMENT to text(if(cultivation) "道果初成" else "新成就解锁"),
+            ContractSemantic.FEEDBACK_COMPLETE to text(if(cultivation) "玉简归轨 · 历练达成" else "行动已完成"),
+            ContractSemantic.FEEDBACK_UP to text(if(cultivation) "境界突破" else "等级提升"),
+            ContractSemantic.FEEDBACK_DOWN to text(if(cultivation) "境界回落 · 仍可重修" else "等级回落 · 可以恢复"),
+            ContractSemantic.FEEDBACK_REPAID to text(if(cultivation) "劫债已偿 · 道心渐稳" else "已用行动偿还债务"),
+            ContractSemantic.FEEDBACK_RECOVERED to text(if(cultivation) "重返仙途" else "重返正轨"),
+            ContractSemantic.FEEDBACK_UNDONE to text(if(cultivation) "撤回达成 · 账目已核对" else "完成已撤销 · 账目已核对"),
             ContractSemantic.GESTURE_HINT to text("右滑完成 · 左滑查看操作；也可直接使用按钮"),
             ContractSemantic.CONTRACT_HISTORY to text("契约历史与补偿"),
             ContractSemantic.STORY_FIRST_ACTION to text(if(cultivation) "初入尘世：第一份修为来自你完成的真实行动。" else "第一步：你已用一次真实行动留下记录。"),
@@ -141,6 +150,7 @@ internal object DeadlineNarrative {
                 add(d.title)
                 if(DisclosureKind.POST_DEADLINE_UNDO in d.kinds) add("撤销会移除原完成奖励 ${d.reward} $xp，并因原截止日期已过结算 ${d.immediateCost} $xp 代价。重做保留原奖励快照。")
                 else if(d.immediateCost>0) add("本次先结算旧契约代价 ${d.immediateCost} $xp。")
+                if(DisclosureKind.REOPEN in d.kinds) add("撤销将重新开启原契约，原截止日期和代价仍生效。已编辑的说明和暂停／归档状态保留；可重新接取后继续履约。")
                 if(d.reward>0 && DisclosureKind.POST_DEADLINE_UNDO !in d.kinds) add("可获奖励 ${d.reward} $xp；原始奖励 / 逾期全额代价 ${d.overdueCost} $xp；提前主动弃约代价 ${ContractMath.abandonment(d.overdueCost)} $xp（50% 向上取整）。逾期仅结算一次，不按离线天数累加。")
                 d.dueDay?.let { add("截止 ${LocalDate.ofEpochDay(it)} 当日结束 · ${d.zoneId}") }
                 if(d.dueToday) add("今天截止：只剩今天的剩余时间，不是完整 24 小时。")
@@ -155,7 +165,7 @@ internal object DeadlineNarrative {
             NarrativePresentation("${b.count} 份契约 · 本批代价 ${b.cost} $xp\n无本批代价 Lv.${b.levelWithoutBatch} → 当前 Lv.${b.currentLevel}",IconRole.WARNING,ColorRole.WARNING)
         }
         map[ContractSemantic.INFO]=NarrativeSemanticEntry(setOf(ContractParameters.CARD)) { a -> val c=a.require(ContractParameters.CARD)
-            val status=when(c.status){"ACTIVE"->"生效中";"FULFILLED"->"按时履约";"OVERDUE"->"逾期已结算";"ABANDONED"->"主动解约";"EXEMPTED"->"现实豁免";else->c.status}
+            val status=when(c.status){"ACTIVE"->"生效中";"FULFILLED"->"按时履约";"OVERDUE"->"逾期已结算";"ABANDONED"->if(cultivation) "解契" else "主动解约";"EXEMPTED"->"现实豁免";else->c.status}
             NarrativePresentation("$contract · $status${if(c.fulfilledLate) " · 后续行动已完成" else ""}\n${LocalDate.ofEpochDay(c.dueDay)} 当日结束 · ${c.zoneId}\n可获 ${c.attainableReward} $xp / 原始 ${c.originalReward} $xp · 延期 ${c.extensions} 次",IconRole.WARNING)
         }
         map[ContractSemantic.SUMMARY]=NarrativeSemanticEntry(setOf(ContractParameters.SUMMARY)) { a -> val p=a.require(ContractParameters.SUMMARY)
@@ -167,11 +177,11 @@ internal object DeadlineNarrative {
         map[ContractSemantic.SETTLEMENT]=NarrativeSemanticEntry(setOf(ContractParameters.SETTLEMENT)) { a ->val s=a.require(ContractParameters.SETTLEMENT)
             NarrativePresentation("${if(cultivation) "历练结算" else "任务结算"} · +${s.awardedXp} $xp\n偿还 $debt ${s.repaidXp} $xp · 当前 Lv.${s.level}" +
                 (if(s.level>s.previousLevel) " · ${if(cultivation) "突破" else "升级"}" else "") +
-                (if(s.achievements>0) " · 新成就 ${s.achievements} 项" else ""),IconRole.COMPLETION,ColorRole.REWARD,EffectRole.COMPLETION)
+                (if(s.achievements>0) " · ${if(cultivation) "新道果" else "新成就"} ${s.achievements} 项" else ""),IconRole.COMPLETION,ColorRole.REWARD,EffectRole.COMPLETION)
         }
         map[ContractSemantic.HIGHEST_LEVEL]=NarrativeSemanticEntry(setOf(SemanticParameters.LEVEL)) { a ->NarrativePresentation("历史最高 Lv.${a.require(SemanticParameters.LEVEL).value}") }
         map[ContractSemantic.LEDGER_ENTRY]=NarrativeSemanticEntry(setOf(ContractParameters.LEDGER)) { a ->val l=a.require(ContractParameters.LEDGER)
-            val action=when(l.kind){"SIGNED"->"签订$contract";"POSTPONED"->"延期 · 调整可获奖励";"RESCHEDULED"->"缩短日期";"EDITED"->"编辑行动说明";"OVERDUE"->"逾期代价";"ABANDONED"->"主动解约";"WAIVER"->"现实豁免";"RESTITUTION"->"返还已偿代价";"REFUND"->"历史退款记录";"ALLOCATION"->"偿还$debt";"REVERSAL"->"撤销偿还分配";"RECOVERY_OPEN"->"开启$recovery";"RECOVERY_CLOSED"->"归正 · 恢复完成";"CLOCK_BACKWARD"->"已记录时钟回退";else->if(l.kind.startsWith("EXEMPTED_")) "现实变故 · 契约豁免" else l.kind}
+            val action=when(l.kind){"SIGNED"->"签订$contract";"POSTPONED"->if(cultivation) "改命 · 调整可获修为" else "延期 · 调整可获奖励";"RESCHEDULED"->"缩短日期";"EDITED"->"编辑行动说明";"OVERDUE"->if(cultivation) "劫罚 · 逾期代价" else "逾期代价";"ABANDONED"->if(cultivation) "解契" else "主动解约";"WAIVER"->"现实豁免";"RESTITUTION"->"返还已偿代价";"REFUND"->"历史退款记录";"ALLOCATION"->"偿还$debt";"REVERSAL"->"撤销偿还分配";"RECOVERY_OPEN"->"开启$recovery";"RECOVERY_CLOSED"->"归正 · 恢复完成";"CLOCK_BACKWARD"->"已记录时钟回退";else->if(l.kind.startsWith("EXEMPTED_")) "现实变故 · 契约豁免" else l.kind}
             val time=Instant.ofEpochMilli(l.createdAt).atZone(ZoneId.of(l.zoneId)).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
             NarrativePresentation("$action · ${l.xp} $xp\n${l.title}\n$time\nID ${l.referenceId}",IconRole.JOURNAL)
         }

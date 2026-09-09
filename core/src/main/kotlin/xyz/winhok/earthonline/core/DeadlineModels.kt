@@ -126,7 +126,7 @@ sealed interface DeadlineCommand {
     data class SelectRecovery(val questIds: List<String>) : DeadlineCommand
 }
 
-enum class DisclosureKind { SIGN, EXTEND, ABANDON, RECOMMIT, POST_DEADLINE_UNDO, FORCE_MAJEURE }
+enum class DisclosureKind { SIGN, EXTEND, ABANDON, RECOMMIT, REOPEN, POST_DEADLINE_UNDO, FORCE_MAJEURE }
 
 data class ContractDisclosure(
     val kinds: Set<DisclosureKind>, val questId: String, val title: String,

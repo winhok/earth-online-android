@@ -39,7 +39,7 @@ data class EarthUiState(
     fun reward(quest: Quest): Int = QuestRules.activeCompletion(quest, world.completions, day)?.xp
         ?: (if (quest.kind == QuestKind.DAILY) null else book.latest(quest.id))?.currentRewardXp?.toInt() ?: QuestRules.reward(quest)
 }
-enum class SettlementFeedback { COMPLETE, LEVEL_UP, LEVEL_DOWN, REPAID, RECOVERED, UNDONE }
+enum class SettlementFeedback { COMPLETE, ACHIEVEMENT, LEVEL_UP, LEVEL_DOWN, REPAID, RECOVERED, UNDONE }
 data class UiMessage(
     val request: SemanticRequest,
     val undoId: String? = null,
@@ -142,6 +142,7 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
                 after.current.level > old.current.level -> SettlementFeedback.LEVEL_UP
                 result.repaidXp > 0 -> SettlementFeedback.REPAID
                 plan.command is DeadlineCommand.Undo -> SettlementFeedback.UNDONE
+                (ProgressRules.achievements(result.state.world) - ProgressRules.achievements(before.world)).isNotEmpty() -> SettlementFeedback.ACHIEVEMENT
                 else -> SettlementFeedback.COMPLETE
             }
             when (plan.command) {

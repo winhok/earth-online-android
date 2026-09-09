@@ -269,6 +269,30 @@ object DeadlineScenarios {
             check(s.world.quests.single().snoozedUntilDay == today + 1)
             check(s.book.liabilities.isEmpty())
         }
+        test("undo reopens archived fulfilled terms without overwriting user edits") {
+            var s = completion(save(initial(), "a", today + 2), "a")
+            s = apply(s, DeadlineCommand.Save(draft(s.world.quests.single()).copy(dueDay = null, skill = Skill.CREATION), "a"))
+            s = apply(s, DeadlineCommand.SetState("a", QuestState.ARCHIVED))
+            val originalQuest = s.world.quests.single()
+            val undo = DeadlineCommand.Undo("a:once")
+            check(DisclosureKind.REOPEN in DeadlineEngine.preview(s, undo, start)!!.kinds)
+            s = apply(s, undo)
+            DeadlineValidation.validate(s)
+            check(s.world.quests.single() == originalQuest)
+            check(s.book.contracts.single().dueDay == today + 2)
+            s = DeadlineEngine.reconcile(s, start + 3 * 86_400_000)
+            check(s.book.liabilities.single().xp == 25L)
+        }
+        test("a pre-completion switch to daily never inherits once contract reward") {
+            var s = save(initial(), "boss", today, QuestKind.BOSS, Difficulty.HARD)
+            s = apply(s, DeadlineCommand.Save(draft(s.world.quests.single()).copy(kind = QuestKind.DAILY,
+                difficulty = Difficulty.EASY, dueDay = today), "boss"))
+            s = completion(s, "boss")
+            check(s.world.completions.single().xp == 10)
+            check(s.book.contracts.single().fulfilledAt == null)
+            s = apply(s, DeadlineCommand.Undo(s.world.completions.single().id))
+            check(s.book.contracts.single().status == "ABANDONED")
+        }
         report("$count deadline scenarios passed")
         return count
     }

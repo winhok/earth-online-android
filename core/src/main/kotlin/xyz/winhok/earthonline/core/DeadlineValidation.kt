@@ -14,7 +14,12 @@ object DeadlineValidation {
             requireRule(c.fulfilledAt == null || c.fulfilledAt >= c.signedAt, RuleError.INVALID_BACKUP)
             if(c.status=="ACTIVE") {
                 val q=world.quests.first { it.id==c.questId }
-                requireRule(q.kind==c.signedKind && q.skill==c.signedSkill && q.dueDay==c.dueDay && q.state==QuestState.ACTIVE,RuleError.INVALID_BACKUP)
+                // Fulfillment permits later metadata/archive edits. Undo reopens the original
+                // promise without silently overwriting those edits; its immutable terms remain authoritative.
+                val reopened = world.completions.any { it.questId == c.questId && it.occurrence == "once" &&
+                    it.revokedAt != null && it.completedAt >= c.signedAt }
+                requireRule(q.kind==c.signedKind && (reopened || (q.skill==c.signedSkill &&
+                    q.dueDay==c.dueDay && q.state==QuestState.ACTIVE)),RuleError.INVALID_BACKUP)
             }
         }
         book.liabilities.forEach { l ->

@@ -54,6 +54,12 @@ fun OverdueBatchDialog(state: EarthUiState, acknowledge: (Set<String>) -> Unit) 
     var expanded by rememberSaveable(pending.map { it.id }.joinToString()) { mutableStateOf(false) }
     val total = pending.sumOf { it.xp }
     val progress = state.progress
+    val view = androidx.compose.ui.platform.LocalView.current
+    // One short signal when this set of committed facts first appears, never on skin change.
+    LaunchedEffect(pending.map { it.id }) {
+        if (state.effects.haptics) view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+        if (state.effects.sound) view.playSoundEffect(android.view.SoundEffectConstants.CLICK)
+    }
     val without = ProgressRules.fromXp((progress.current.xp - progress.debtXp + total).coerceAtLeast(0))
     Dialog(onDismissRequest = {}, properties = DialogProperties(
         usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false,
@@ -101,7 +107,7 @@ fun ForceMajeureDialog(contract: TimeContract, busy: Boolean, dismiss: () -> Uni
         ForceMajeureReason.FAMILY to ContractSemantic.REASON_FAMILY,
         ForceMajeureReason.EXTERNAL to ContractSemantic.REASON_EXTERNAL,
         ForceMajeureReason.OTHER to ContractSemantic.REASON_OTHER)
-    AlertDialog(onDismissRequest = dismiss, title = { Text(presenter.text(ActionSemantic.APPLY_FORCE_MAJEURE)) },
+    AlertDialog(onDismissRequest = dismiss, modifier = Modifier.testTag("force-majeure-dialog"), title = { Text(presenter.text(ActionSemantic.APPLY_FORCE_MAJEURE)) },
         text = { Column(Modifier.verticalScroll(rememberScrollState())) {
             Text(presenter.text(ContractSemantic.FORCE_REASON))
             keys.forEach { (value, key) ->
@@ -113,7 +119,7 @@ fun ForceMajeureDialog(contract: TimeContract, busy: Boolean, dismiss: () -> Uni
                 }
             }
         } },
-        confirmButton = { TextButton(onClick = { choose(reason) }, enabled = !busy) { Text(presenter.text(ActionSemantic.CONFIRM)) } },
+        confirmButton = { TextButton(onClick = { choose(reason) }, enabled = !busy, modifier = Modifier.testTag("confirm-force-majeure")) { Text(presenter.text(ActionSemantic.CONFIRM)) } },
         dismissButton = { TextButton(onClick = dismiss) { Text(presenter.text(ActionSemantic.CANCEL)) } })
 }
 
@@ -137,7 +143,7 @@ fun ContractLedgerScreen(state: EarthUiState, model: EarthViewModel, close: () -
         Surface(Modifier.fillMaxSize().testTag("contract-ledger")) {
             Scaffold(topBar = { TopAppBar(title = { Text(presenter.text(ContractSemantic.LEDGER_TITLE)) },
                 navigationIcon = { TextButton(onClick = close) { Text(presenter.text(ActionSemantic.CLOSE)) } }) }) { padding ->
-                LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp),
+                LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("contract-ledger-list"), contentPadding = PaddingValues(20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     item { ContractBalance(state) }
                     item { Text(presenter.text(ContractSemantic.RULES), style = MaterialTheme.typography.bodySmall) }
@@ -158,7 +164,7 @@ fun ContractLedgerScreen(state: EarthUiState, model: EarthViewModel, close: () -
                             })) }
                             if (candidates.isEmpty()) item { Text(presenter.text(ContractSemantic.RECOVERY_EMPTY)) }
                             items(candidates, key = { "choose-${it.id}" }) { q ->
-                                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(value = q.id in selected,
+                                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("recovery-choice-${q.id}").toggleable(value = q.id in selected,
                                     role = Role.Checkbox, enabled = !state.busy, onValueChange = { checked ->
                                         selected = if (checked) (selected + q.id).distinct() else selected - q.id
                                     }), verticalAlignment = Alignment.CenterVertically) {

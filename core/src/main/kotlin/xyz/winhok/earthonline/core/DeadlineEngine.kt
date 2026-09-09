@@ -142,7 +142,14 @@ object DeadlineEngine {
                 if (c != null && c.status == "FULFILLED" && now >= c.boundary())
                     ContractDisclosure(setOf(DisclosureKind.POST_DEADLINE_UNDO), c.questId, quest(c.questId).title,
                         immediateCost = c.originalRewardXp, reward = completion.xp.toLong(), zoneId = c.zoneId, contractId = c.id)
-                else null
+                else if (c != null && c.status == "FULFILLED") {
+                    val q = quest(c.questId)
+                    if (q.state != QuestState.ACTIVE || q.dueDay != c.dueDay || q.skill != c.signedSkill)
+                        ContractDisclosure(setOf(DisclosureKind.REOPEN), c.questId, q.title,
+                            reward = completion.xp.toLong(), overdueCost = c.originalRewardXp,
+                            dueDay = c.dueDay, zoneId = c.zoneId, contractId = c.id)
+                    else null
+                } else null
             }
             is DeadlineCommand.Waive -> {
                 val c = book.contracts.firstOrNull { it.id == command.contractId } ?: throw RuleViolation(RuleError.MISSING_QUEST)

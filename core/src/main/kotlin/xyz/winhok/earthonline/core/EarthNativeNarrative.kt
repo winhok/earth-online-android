@@ -335,7 +335,7 @@ internal object EarthNativeNarrative {
                     NarrativePresentation("${progress.intoLevel} / ${progress.needed} XP")
                 } },
             ),
-            ScreenSemantic.TOTAL_XP to textEntry("累计经验"),
+            ScreenSemantic.TOTAL_XP to textEntry("当前有效经验"),
             ScreenSemantic.COMPLETION_COUNT to textEntry("完成次数"),
             ScreenSemantic.CURRENT_STREAK to NarrativeSemanticEntry(
                 parameters = setOf(SemanticParameters.COUNT),
@@ -410,7 +410,7 @@ internal object EarthNativeNarrative {
                 parameters = setOf(SemanticParameters.ZONE_ID),
                 render = { arguments -> NarrativePresentation(
                     "存档结算时区：${arguments.require(SemanticParameters.ZONE_ID).value}\n" +
-                        "日常按此时区的自然日刷新，旅行或修改设备时区不会切换结算时区。1.0 不提供时区迁移。",
+                        "日常按此时区的自然日刷新，旅行或修改设备时区不会切换结算时区。本版不提供时区迁移。",
                 ) },
             ),
             ScreenSemantic.BACKUP_TITLE to textEntry("本地存档"),
@@ -428,9 +428,9 @@ internal object EarthNativeNarrative {
             ScreenSemantic.ABOUT_BODY to textEntry(
                 "离线单人版 · Kotlin + Jetpack Compose\n不接入广告、分析 SDK、账号或 AI 云服务。",
             ),
-            ScreenSemantic.PRIVACY_TITLE to textEntry("隐私说明 · 离线 1.0"),
+            ScreenSemantic.PRIVACY_TITLE to textEntry("隐私说明 · 离线单人版"),
             ScreenSemantic.PRIVACY_BODY to textEntry(
-                "本应用在应用沙盒的 Room 数据库中保存玩家设置、任务、主线、完成记录及手记。\n\n" +
+                "本应用在应用沙盒的 Room 数据库中保存玩家设置、任务、主线、完成记录、手记、契约、代价、偿债分配、不可抗力原因类别以及展示偏好。\n\n" +
                     "应用没有联网、定位、广告、埋点和远程 AI 功能。系统通知仅在你主动开启后使用；通知不显示任务标题。\n\n" +
                     "存档依靠设备本身的存储保护，数据库未另加应用层加密。系统自动备份已在清单中禁用；厂商行为仍需真机验证。\n\n" +
                     "导出会把明文数据写入你选择的位置，所选文件提供商可能是云盘。导入仅在本机解析。分享和保管导出文件由你控制。\n\n" +
@@ -438,7 +438,7 @@ internal object EarthNativeNarrative {
             ),
             ScreenSemantic.DELETE_DATA_TITLE to textEntry("删除本机全部存档"),
             ScreenSemantic.DELETE_DATA_BODY to textEntry(
-                "任务、主线、经验和日志都会删除。无法在应用内撤回。请先导出存档，再输入“删除”确认。",
+                "任务、主线、经验、契约、债务、日志及偏好都会删除。无法在应用内撤回。请先导出存档，再输入“删除”确认。",
             ),
             ScreenSemantic.DELETE_CONFIRM_FIELD to textEntry("输入：删除"),
             ScreenSemantic.RESTORE_TITLE to textEntry("覆盖本机存档？"),
@@ -477,8 +477,8 @@ internal object EarthNativeNarrative {
             ErrorSemantic.INVALID_BACKUP to textEntry("存档校验失败，原有数据没有被修改。"),
             NotificationSemantic.REMINDER_CHANNEL to textEntry("每日冒险提醒"),
             NotificationSemantic.REMINDER_TITLE to textEntry("冒险仍在继续"),
-            NotificationSemantic.COMPLETION_UNDONE to textEntry("已撤销，经验也已恢复至完成前。"),
-            NotificationSemantic.QUEST_POSTPONED to textEntry("已暂缓一天。原截止日期保留，不扣经验。"),
+            NotificationSemantic.COMPLETION_UNDONE to textEntry("已撤销本次奖励及对应偿债分配。当前经验与债务已按账本重新核对。"),
+            NotificationSemantic.QUEST_POSTPONED to textEntry("暂缓已保存。当前截止日期、可获奖励和代价以任务详情中的契约记录为准。"),
             NotificationSemantic.REMINDER_AVAILABLE to NarrativeSemanticEntry(
                 parameters = setOf(SemanticParameters.COUNT),
                 render = { arguments -> NarrativePresentation(

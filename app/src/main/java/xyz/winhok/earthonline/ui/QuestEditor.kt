@@ -209,7 +209,7 @@ fun QuestDetail(quest: Quest, state: EarthUiState, onDismiss: () -> Unit, onEdit
                     }
                 } else if (quest.kind != QuestKind.DAILY && quest.dueDay != null && completion == null) {
                     Text(presenter.text(ContractSemantic.UNSIGNED), Modifier.testTag("legacy-unsigned"))
-                    if ((quest.dueDay ?: Long.MIN_VALUE) >= state.day) OutlinedButton(onClick = onCalibrate,
+                    if (quest.state == QuestState.ACTIVE && (quest.dueDay ?: Long.MIN_VALUE) >= state.day) OutlinedButton(onClick = onCalibrate,
                         enabled = !state.busy, modifier = Modifier.testTag("calibrate-contract")) {
                         Text(presenter.text(ContractSemantic.CALIBRATE))
                     }
@@ -246,7 +246,7 @@ fun QuestDetail(quest: Quest, state: EarthUiState, onDismiss: () -> Unit, onEdit
                 }
                 OutlinedButton(onClick = onEdit, enabled = !state.busy) { Text(presenter.text(ActionSemantic.EDIT_QUEST)) }
                 if (quest.state == QuestState.ACTIVE && completion == null) {
-                    TextButton(onClick = onPostpone, enabled = !state.busy) { Text(presenter.text(if (contract?.status == "ACTIVE") ContractSemantic.POSTPONE_SIGNED else ActionSemantic.POSTPONE_QUEST)) }
+                    TextButton(onClick = onPostpone, modifier = Modifier.testTag("postpone-contract"), enabled = !state.busy) { Text(presenter.text(if (contract?.status == "ACTIVE") ContractSemantic.POSTPONE_SIGNED else ActionSemantic.POSTPONE_QUEST)) }
                     TextButton(onClick = { onState(QuestState.PAUSED) }, enabled = !state.busy) {
                         Text(presenter.text(ActionSemantic.PAUSE_QUEST))
                     }
