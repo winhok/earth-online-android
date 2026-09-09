@@ -9,9 +9,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import xyz.winhok.earthonline.core.ThemeMode
+import xyz.winhok.earthonline.core.NarrativeLocale
+import xyz.winhok.earthonline.core.NarrativeRegistry
+import xyz.winhok.earthonline.core.NarrativeScheme
+import xyz.winhok.earthonline.core.NarrativeSystemId
 import xyz.winhok.earthonline.ui.*
 
 class MainActivity : ComponentActivity() {
@@ -31,7 +36,17 @@ class MainActivity : ComponentActivity() {
                 )
                 onDispose { }
             }
-            EarthTheme(mode) { EarthApp(model, state) }
+            val narrative = remember(dark) {
+                RegistryNarrativePresenter(
+                    registry = NarrativeRegistry.builtIns(),
+                    systemId = NarrativeSystemId.EARTH_NATIVE,
+                    locale = NarrativeLocale.ZH_CN,
+                    scheme = if (dark) NarrativeScheme.DARK else NarrativeScheme.LIGHT,
+                )
+            }
+            EarthTheme(mode) {
+                NarrativeHost(narrative) { EarthApp(model, state) }
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -19,6 +20,7 @@ import xyz.winhok.earthonline.core.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EarthApp(model: EarthViewModel, state: EarthUiState) {
+    val presenter = LocalNarrativePresenter.current
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var editorOpen by rememberSaveable { mutableStateOf(false) }
@@ -29,14 +31,16 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
     var noteOpen by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val holder = rememberSaveableStateHolder()
-    val labels = listOf("指挥台", "任务", "角色", "日志")
-    val icons = listOf(Icons.Default.Explore, Icons.Default.TaskAlt, Icons.Default.PersonOutline, Icons.Default.History)
     val ready = !state.loading && !state.loadError && state.world.player.onboarded
     val create: () -> Unit = { editId = null; editorOpen = true }
     val openGoal: (String?) -> Unit = { goalId = it; goalOpen = true }
     LaunchedEffect(model) {
         model.messages.collect { message ->
-            val result = snackbar.showSnackbar(message.text, actionLabel = message.undoId?.let { "撤销" },
+            val result = snackbar.showSnackbar(
+                message.text,
+                actionLabel = message.undoId?.let { presenter.text(ActionSemantic.UNDO_COMPLETION, semanticArguments {
+                    put(SemanticParameters.UNDO_COMPLETION_LABEL, UndoCompletionLabel.SHORT)
+                }) },
                 withDismissAction = true, duration = SnackbarDuration.Long)
             if (result == SnackbarResult.ActionPerformed) message.undoId?.let(model::undo)
         }
@@ -53,42 +57,48 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
         Scaffold(
             topBar = { if (ready) TopAppBar(title = {
                 Column {
-                    Text("地球 Online", style = MaterialTheme.typography.titleLarge)
+                    Text(presenter.text(ScreenSemantic.APP_NAME), style = MaterialTheme.typography.titleLarge)
                     Text(state.world.player.server, style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }, actions = {
-                IconButton(onClick = { settings = true }, enabled = !state.busy) { Icon(Icons.Default.Settings, "设置与存档") }
+                IconButton(onClick = { settings = true }, enabled = !state.busy) {
+                    Icon(Icons.Default.Settings, presenter.text(ActionSemantic.OPEN_SETTINGS))
+                }
             }) },
             bottomBar = {
-                if (ready && !wide) NavigationBar {
-                    labels.forEachIndexed { index, label ->
-                        NavigationBarItem(selected = tab == index, onClick = { tab = index },
-                            icon = { Icon(icons[index], null) }, label = { Text(label) })
-                    }
-                }
+                if (ready && !wide) PrimaryNavigation(tab, expanded = false) { tab = it }
             },
             floatingActionButton = {
                 if (ready && (tab == 0 || tab == 1)) ExtendedFloatingActionButton(onClick = create,
-                    modifier = Modifier.testTag("create-quest").semantics { contentDescription = "接取任务" },
-                    icon = { Icon(Icons.Default.Add, null) }, text = { Text("接取任务") })
-                if (ready && tab == 3) FloatingActionButton(onClick = { noteOpen = true }) { Icon(Icons.Default.EditNote, "写冒险手记") }
+                    modifier = Modifier.testTag("create-quest").semantics {
+                        contentDescription = presenter.text(ActionSemantic.CREATE_QUEST)
+                    },
+                    icon = { Icon(Icons.Default.Add, null) },
+                    text = { Text(presenter.text(ActionSemantic.CREATE_QUEST)) })
+                if (ready && tab == 3) FloatingActionButton(onClick = { noteOpen = true }) {
+                    Icon(Icons.Default.EditNote, presenter.text(ActionSemantic.WRITE_NOTE))
+                }
             },
             snackbarHost = { SnackbarHost(snackbar) },
         ) { padding ->
             Row(Modifier.fillMaxSize().padding(padding)) {
-                if (ready && wide) NavigationRail {
-                    labels.forEachIndexed { index, label ->
-                        NavigationRailItem(selected = tab == index, onClick = { tab = index },
-                            icon = { Icon(icons[index], null) }, label = { Text(label) })
-                    }
-                }
+                if (ready && wide) PrimaryNavigation(tab, expanded = true) { tab = it }
                 Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
                     Box(Modifier.widthIn(max = 880.dp).fillMaxSize()) {
                         when {
-                            state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                            state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(Modifier.semantics {
+                                    contentDescription = presenter.text(StateSemantic.LOADING)
+                                })
+                            }
                             state.loadError -> Column(Modifier.padding(24.dp)) {
-                                EmptyState("无法读取存档", "请重试。应用不会为了启动而清空数据库。", "重新读取", model::retryLoad)
+                                EmptyState(
+                                    presenter.text(ScreenSemantic.LOAD_ERROR_TITLE),
+                                    presenter.text(ScreenSemantic.LOAD_ERROR_BODY),
+                                    presenter.text(ActionSemantic.RETRY_LOAD),
+                                    model::retryLoad,
+                                )
                             }
                             !state.world.player.onboarded -> JoinScreen(state.busy, model::join)
                             else -> holder.SaveableStateProvider(tab) {
@@ -123,4 +133,44 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
         onState = { model.setQuestState(detailedQuest.id, it); detailId = null },
     )
     }
+}
+
+@Composable
+fun PrimaryNavigation(
+    selectedIndex: Int,
+    expanded: Boolean,
+    onSelect: (Int) -> Unit,
+) {
+    val presenter = LocalNarrativePresenter.current
+    val presentations = DestinationSemantic.entries.map { presenter.present(it) }
+    if (expanded) {
+        NavigationRail {
+            presentations.forEachIndexed { index, presentation ->
+                NavigationRailItem(
+                    selected = selectedIndex == index,
+                    onClick = { onSelect(index) },
+                    icon = { Icon(presentation.iconRole.navigationIcon(), null) },
+                    label = { Text(presentation.text) },
+                )
+            }
+        }
+    } else {
+        NavigationBar {
+            presentations.forEachIndexed { index, presentation ->
+                NavigationBarItem(
+                    selected = selectedIndex == index,
+                    onClick = { onSelect(index) },
+                    icon = { Icon(presentation.iconRole.navigationIcon(), null) },
+                    label = { Text(presentation.text) },
+                )
+            }
+        }
+    }
+}
+
+private fun IconRole.navigationIcon(): ImageVector = when (this) {
+    IconRole.QUEST -> Icons.Default.TaskAlt
+    IconRole.CHARACTER -> Icons.Default.PersonOutline
+    IconRole.JOURNAL -> Icons.Default.History
+    else -> Icons.Default.Explore
 }

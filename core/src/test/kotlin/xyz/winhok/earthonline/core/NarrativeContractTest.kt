@@ -27,6 +27,107 @@ class NarrativeContractTest {
     }
 
     @Test
+    fun earthNativeInterpretsAllPrimaryDestinations() {
+        val registry = NarrativeRegistry.builtIns()
+        val expected = mapOf(
+            DestinationSemantic.DASHBOARD to "指挥台",
+            DestinationSemantic.QUESTS to "任务",
+            DestinationSemantic.PROFILE to "角色",
+            DestinationSemantic.JOURNAL to "日志",
+        )
+
+        expected.forEach { (key, text) ->
+            assertEquals(
+                text,
+                registry.interpret(
+                    NarrativeSystemId.EARTH_NATIVE,
+                    SemanticRequest(key),
+                    NarrativeLocale.ZH_CN,
+                    NarrativeScheme.DARK,
+                ).text,
+            )
+        }
+    }
+
+    @Test
+    fun earthNativeInterpretsOperationalShellDashboardAndQuestCardCopy() {
+        val registry = NarrativeRegistry.builtIns()
+        fun text(key: SemanticKey, arguments: SemanticArguments = SemanticArguments.EMPTY) =
+            registry.interpret(
+                NarrativeSystemId.EARTH_NATIVE,
+                SemanticRequest(key, arguments),
+                NarrativeLocale.ZH_CN,
+                NarrativeScheme.DARK,
+            ).text
+
+        assertEquals("地球 Online", text(ScreenSemantic.APP_NAME))
+        assertEquals("现实没有重开键，\n但随时可以接取下一项任务。", text(ScreenSemantic.JOIN_TAGLINE))
+        assertEquals("玩家名", text(FieldSemantic.PLAYER_NAME))
+        assertEquals("创建本地角色", text(ActionSemantic.JOIN))
+        assertEquals("重新读取", text(ActionSemantic.RETRY_LOAD))
+        assertEquals("正在读取存档", text(StateSemantic.LOADING))
+        assertEquals("所属任务", text(ActionSemantic.VIEW_GOAL_QUESTS))
+        assertEquals(
+            "Lv.4  现实探索者",
+            text(ScreenSemantic.DASHBOARD_LEVEL, semanticArguments {
+                put(SemanticParameters.LEVEL, LevelNumber(4))
+            }),
+        )
+        assertEquals(
+            "23 / 100 XP · 今日完成 2 项",
+            text(ScreenSemantic.DASHBOARD_PROGRESS, semanticArguments {
+                put(SemanticParameters.PROGRESS, LevelProgress(23, 100, 2))
+            }),
+        )
+        assertEquals(
+            "已过截止日 · 精力匹配",
+            text(ScreenSemantic.RECOMMENDATION_REASONS, semanticArguments {
+                put(
+                    SemanticParameters.RECOMMENDATION_REASONS,
+                    RecommendationReasons(listOf(RecommendationReason.OVERDUE, RecommendationReason.FITS_ENERGY)),
+                )
+            }),
+        )
+        assertEquals(
+            "支线 · 25 分钟 · 学识 · 2026-09-09 截止 · 暂缓至 2026-09-10",
+            text(ScreenSemantic.QUEST_META, semanticArguments {
+                put(
+                    SemanticParameters.QUEST_META,
+                    QuestMetaPresentation(
+                        kind = QuestKind.SIDE,
+                        estimatedMinutes = 25,
+                        skill = Skill.KNOWLEDGE,
+                        dueDay = java.time.LocalDate.of(2026, 9, 9).toEpochDay(),
+                        snoozedUntilDay = java.time.LocalDate.of(2026, 9, 10).toEpochDay(),
+                        today = java.time.LocalDate.of(2026, 9, 9).toEpochDay(),
+                    ),
+                )
+            }),
+        )
+        assertEquals(
+            "完成任务：逐字标题 😀",
+            text(ActionSemantic.COMPLETE_QUEST, semanticArguments {
+                put(
+                    SemanticParameters.COMPLETE_QUEST_LABEL,
+                    CompleteQuestLabel(CompleteQuestLabelStyle.ACCESSIBILITY, OpaqueText("逐字标题 😀")),
+                )
+            }),
+        )
+        assertEquals(
+            "P2 · 挑战",
+            text(ScreenSemantic.QUEST_PRIORITY_DIFFICULTY, semanticArguments {
+                put(SemanticParameters.QUEST_PRIORITY_DIFFICULTY, QuestPriorityDifficulty(2, Difficulty.HARD))
+            }),
+        )
+        assertEquals(
+            "一次性任务 2 / 5 · 日常贡献 7 次",
+            text(ScreenSemantic.GOAL_PROGRESS, semanticArguments {
+                put(SemanticParameters.GOAL_PROGRESS, GoalProgress(2, 5, 7))
+            }),
+        )
+    }
+
+    @Test
     fun earthNativeManifestDeclaresVersionsMatrixInheritanceAndResources() {
         val registry = NarrativeRegistry.builtIns()
 
@@ -49,7 +150,7 @@ class NarrativeContractTest {
             manifest.semanticCapabilities.getValue(NotificationSemantic.QUEST_COMPLETED),
         )
         assertEquals(
-            SemanticAvailability.SHARED_SURFACE,
+            SemanticAvailability.DIRECT_CATALOG,
             manifest.semanticCapabilities.getValue(ActionSemantic.COMPLETE_QUEST),
         )
         assertEquals(

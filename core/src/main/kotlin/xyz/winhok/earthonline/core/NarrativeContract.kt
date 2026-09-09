@@ -74,6 +74,22 @@ object SemanticParameters {
     val DESCRIPTION = SemanticParameter<OpaqueText>("description")
     val NOTE = SemanticParameter<OpaqueText>("note")
     val LEVEL = SemanticParameter<LevelNumber>("level")
+    val DAY = SemanticParameter<EpochDay>("day")
+    val COUNT = SemanticParameter<CountValue>("count")
+    val MINUTES = SemanticParameter<CountValue>("minutes")
+    val TEXT_LENGTH = SemanticParameter<CountValue>("text-length")
+    val PROGRESS = SemanticParameter<LevelProgress>("progress")
+    val RECOMMENDATION_REASONS = SemanticParameter<RecommendationReasons>("recommendation-reasons")
+    val QUEST_META = SemanticParameter<QuestMetaPresentation>("quest-meta")
+    val QUEST_PRIORITY_DIFFICULTY = SemanticParameter<QuestPriorityDifficulty>("quest-priority-difficulty")
+    val GOAL_PROGRESS = SemanticParameter<GoalProgress>("goal-progress")
+    val GOAL_TITLE = SemanticParameter<GoalTitlePresentation>("goal-title")
+    val QUEST_DETAIL = SemanticParameter<QuestDetailPresentation>("quest-detail")
+    val COMPLETION_MOMENT = SemanticParameter<CompletionMoment>("completion-moment")
+    val DIFFICULTY_REWARD = SemanticParameter<DifficultyReward>("difficulty-reward")
+    val COMPLETE_QUEST_LABEL = SemanticParameter<CompleteQuestLabel>("complete-quest-label")
+    val UNDO_COMPLETION_LABEL = SemanticParameter<UndoCompletionLabel>("undo-completion-label")
+    val ARCHIVE_QUEST_LABEL = SemanticParameter<ArchiveQuestLabel>("archive-quest-label")
 }
 
 /** Player-authored text is inserted verbatim and never sent through narrative translation. */
@@ -92,6 +108,65 @@ value class LevelNumber(val value: Int) {
     init {
         require(value > 0)
     }
+}
+
+@JvmInline
+value class EpochDay(val value: Long)
+
+@JvmInline
+value class CountValue(val value: Int) {
+    init { require(value >= 0) }
+}
+
+data class LevelProgress(val intoLevel: Long, val needed: Long, val completedToday: Int) {
+    init { require(intoLevel >= 0 && needed > 0 && completedToday >= 0) }
+}
+
+data class RecommendationReasons(val values: List<RecommendationReason>) {
+    init { require(values.isNotEmpty()) }
+}
+
+data class QuestMetaPresentation(
+    val kind: QuestKind,
+    val estimatedMinutes: Int,
+    val skill: Skill,
+    val dueDay: Long?,
+    val snoozedUntilDay: Long?,
+    val today: Long,
+) {
+    init { require(estimatedMinutes > 0) }
+}
+
+data class QuestPriorityDifficulty(val displayPriority: Int, val difficulty: Difficulty) {
+    init { require(displayPriority in 1..3) }
+}
+
+data class GoalProgress(val completed: Int, val total: Int, val dailyContributions: Int) {
+    init { require(completed >= 0 && total >= 0 && completed <= total && dailyContributions >= 0) }
+}
+
+data class GoalTitlePresentation(val title: OpaqueText, val archived: Boolean, val compact: Boolean = false)
+
+data class QuestDetailPresentation(val xp: Int, val postponeCount: Int) {
+    init { require(xp >= 0 && postponeCount >= 0) }
+}
+
+data class DifficultyReward(val difficulty: Difficulty, val xp: Int) {
+    init { require(xp >= 0) }
+}
+
+enum class CompleteQuestLabelStyle { SHORT, CONFIRM, ACCESSIBILITY }
+
+data class CompleteQuestLabel(val style: CompleteQuestLabelStyle, val title: OpaqueText? = null) {
+    init { require((style == CompleteQuestLabelStyle.ACCESSIBILITY) == (title != null)) }
+}
+
+enum class UndoCompletionLabel { SHORT, DETAIL }
+
+enum class ArchiveQuestLabel { DETAIL, CONFIRM }
+
+data class CompletionMoment(val epochMillis: Long, val zoneId: String) {
+    init { java.time.ZoneId.of(zoneId) }
 }
 
 class SemanticArguments private constructor(

@@ -1,0 +1,102 @@
+package xyz.winhok.earthonline
+
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import xyz.winhok.earthonline.core.DestinationSemantic
+import xyz.winhok.earthonline.core.NarrativePresentation
+import xyz.winhok.earthonline.core.SemanticRequest
+import xyz.winhok.earthonline.core.ThemeMode
+import xyz.winhok.earthonline.core.ActionSemantic
+import xyz.winhok.earthonline.core.Quest
+import xyz.winhok.earthonline.core.ScreenSemantic
+import xyz.winhok.earthonline.ui.EarthTheme
+import xyz.winhok.earthonline.ui.NarrativeHost
+import xyz.winhok.earthonline.ui.NarrativePresenter
+import xyz.winhok.earthonline.ui.PrimaryNavigation
+import xyz.winhok.earthonline.ui.QuestCard
+
+@RunWith(AndroidJUnit4::class)
+class OperationalNarrativeUiTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun primaryNavigationRequestsStableDestinationSemanticsAndKeepsActions() {
+        val presenter = RecordingPresenter()
+        var selected = 0
+
+        compose.setContent {
+            EarthTheme(ThemeMode.DARK) {
+                NarrativeHost(presenter) {
+                    PrimaryNavigation(
+                        selectedIndex = selected,
+                        expanded = false,
+                        onSelect = { selected = it },
+                    )
+                }
+            }
+        }
+
+        DestinationSemantic.entries.forEach { destination ->
+            compose.onNodeWithText(destination.wireId).assertIsDisplayed()
+        }
+        assertEquals(DestinationSemantic.entries.toSet(), presenter.requests.map { it.key }.toSet())
+        compose.onNodeWithText(DestinationSemantic.QUESTS.wireId).performClick()
+        assertEquals(1, selected)
+    }
+
+    @Test
+    fun questCardRequestsStructuredSemanticsPreservesTitleAndCompletionAction() {
+        val presenter = RecordingPresenter()
+        var completions = 0
+        val quest = Quest(
+            id = "quest-1",
+            title = "逐字玩家标题 😀",
+            postponeCount = 3,
+            createdAt = 1,
+            updatedAt = 1,
+        )
+
+        compose.setContent {
+            EarthTheme(ThemeMode.DARK) {
+                NarrativeHost(presenter) {
+                    QuestCard(
+                        quest = quest,
+                        day = 1,
+                        done = false,
+                        busy = false,
+                        onOpen = {},
+                        onComplete = { completions += 1 },
+                    )
+                }
+            }
+        }
+
+        compose.onNodeWithText(quest.title).assertIsDisplayed()
+        compose.onNodeWithText(ScreenSemantic.QUEST_META.wireId).assertIsDisplayed()
+        compose.onNodeWithContentDescription(ActionSemantic.COMPLETE_QUEST.wireId).performClick()
+
+        assertEquals(1, completions)
+        assertTrue(ScreenSemantic.QUEST_REWARD in presenter.requests.map { it.key })
+        assertTrue(ScreenSemantic.QUEST_PRIORITY_DIFFICULTY in presenter.requests.map { it.key })
+        assertTrue(xyz.winhok.earthonline.core.StateSemantic.REVIEW_REQUIRED in presenter.requests.map { it.key })
+    }
+
+    private class RecordingPresenter : NarrativePresenter {
+        val requests = mutableListOf<SemanticRequest>()
+
+        override fun present(request: SemanticRequest): NarrativePresentation {
+            requests += request
+            return NarrativePresentation(request.key.wireId)
+        }
+    }
+}

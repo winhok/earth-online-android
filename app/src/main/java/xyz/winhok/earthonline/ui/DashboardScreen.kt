@@ -17,23 +17,26 @@ import xyz.winhok.earthonline.core.*
 
 @Composable
 fun JoinScreen(busy: Boolean, join: (String, String) -> Unit) {
+    val presenter = LocalNarrativePresenter.current
     var name by rememberSaveable { mutableStateOf("") }
-    var server by rememberSaveable { mutableStateOf("现实服") }
+    var server by rememberSaveable { mutableStateOf(presenter.text(ScreenSemantic.DEFAULT_SERVER_NAME)) }
     LazyColumn(Modifier.fillMaxSize().imePadding().testTag("join-form"), contentPadding = PaddingValues(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { Spacer(Modifier.height(16.dp)); PlanetMark() }
         item {
-            Text("地球 Online", style = MaterialTheme.typography.headlineLarge)
-            Text("现实没有重开键，\n但随时可以接取下一项任务。", style = MaterialTheme.typography.titleMedium,
+            Text(presenter.text(ScreenSemantic.APP_NAME), style = MaterialTheme.typography.headlineLarge)
+            Text(presenter.text(ScreenSemantic.JOIN_TAGLINE), style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 12.dp))
         }
-        item { OutlinedTextField(name, { name = it.take(32) }, label = { Text("玩家名") },
+        item { OutlinedTextField(name, { name = it.take(32) }, label = { Text(presenter.text(FieldSemantic.PLAYER_NAME)) },
             singleLine = true, modifier = Modifier.fillMaxWidth().testTag("player-name"), enabled = !busy) }
-        item { OutlinedTextField(server, { server = it.take(40) }, label = { Text("服务器名（自己取一个）") },
+        item { OutlinedTextField(server, { server = it.take(40) }, label = { Text(presenter.text(FieldSemantic.SERVER_NAME)) },
             singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !busy) }
         item { Button(onClick = { join(name, server) }, enabled = !busy && name.isNotBlank() && server.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("join-submit")) { Text("创建本地角色") } }
-        item { Text("无需账号 · 无广告 · 无云端上传\n任务保存在本机。卸载前请导出存档；备份文件为明文。\n这里不因拖延扣血，也不评价你的现实价值。",
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("join-submit")) {
+            Text(presenter.text(ActionSemantic.JOIN))
+        } }
+        item { Text(presenter.text(ScreenSemantic.JOIN_PRIVACY_NOTICE),
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
@@ -41,6 +44,7 @@ fun JoinScreen(busy: Boolean, join: (String, String) -> Unit) {
 @Composable
 fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> Unit, complete: (String) -> Unit,
                     allQuests: () -> Unit, goal: (String?) -> Unit) {
+    val presenter = LocalNarrativePresenter.current
     var minutes by rememberSaveable { mutableIntStateOf(25) }
     var energy by rememberSaveable { mutableIntStateOf(2) }
     val world = state.world
@@ -59,56 +63,86 @@ fun DashboardScreen(state: EarthUiState, create: () -> Unit, open: (String) -> U
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("${world.player.name}，欢迎上线", style = MaterialTheme.typography.titleLarge)
-                            Text("${dateLabel(day)} · 单人冒险模式", style = MaterialTheme.typography.bodySmall)
+                            Text(presenter.text(ScreenSemantic.PLAYER_WELCOME, semanticArguments {
+                                put(SemanticParameters.PLAYER_NAME, OpaqueText(world.player.name))
+                            }), style = MaterialTheme.typography.titleLarge)
+                            Text(presenter.text(ScreenSemantic.DASHBOARD_DAY_MODE, semanticArguments {
+                                put(SemanticParameters.DAY, EpochDay(day))
+                            }), style = MaterialTheme.typography.bodySmall)
                         }
                         PlanetMark(Modifier.size(64.dp))
                     }
-                    Text("Lv.${progress.level}  现实探索者", style = MaterialTheme.typography.headlineSmall)
+                    Text(presenter.text(ScreenSemantic.DASHBOARD_LEVEL, semanticArguments {
+                        put(SemanticParameters.LEVEL, LevelNumber(progress.level))
+                    }), style = MaterialTheme.typography.headlineSmall)
                     LinearProgressIndicator(progress = { progress.fraction }, modifier = Modifier.fillMaxWidth())
-                    Text("${progress.intoLevel} / ${progress.needed} XP · 今日完成 $todayDone 项",
+                    Text(presenter.text(ScreenSemantic.DASHBOARD_PROGRESS, semanticArguments {
+                        put(SemanticParameters.PROGRESS, LevelProgress(progress.intoLevel, progress.needed, todayDone))
+                    }),
                         style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
-        item { SectionTitle("现在做什么", "由你选择时间与精力，系统给出可解释的推荐。") }
+        item { SectionTitle(
+            presenter.text(ScreenSemantic.DASHBOARD_PROMPT_TITLE),
+            presenter.text(ScreenSemantic.DASHBOARD_PROMPT_BODY),
+        ) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(15, 25, 45, 90).forEach { value -> FilterChip(selected = minutes == value,
-                        onClick = { minutes = value }, label = { Text("$value 分钟") }) }
+                        onClick = { minutes = value }, label = { Text(presenter.text(ScreenSemantic.MINUTE_OPTION,
+                            semanticArguments { put(SemanticParameters.MINUTES, CountValue(value)) })) }) }
                 }
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("低精力", "中精力", "高精力").forEachIndexed { index, label -> FilterChip(selected = energy == index + 1,
-                        onClick = { energy = index + 1 }, label = { Text(label) }) }
+                    listOf(ScreenSemantic.ENERGY_LOW, ScreenSemantic.ENERGY_MEDIUM, ScreenSemantic.ENERGY_HIGH)
+                        .forEachIndexed { index, key -> FilterChip(selected = energy == index + 1,
+                            onClick = { energy = index + 1 }, label = { Text(presenter.text(key)) }) }
                 }
             }
         }
         item {
-            if (recommendation == null) EmptyState("这段时间不必硬塞任务", "可以调整时间与精力，或接取一项更小的任务。", "接取任务", create)
+            if (recommendation == null) EmptyState(
+                presenter.text(ScreenSemantic.RECOMMENDATION_EMPTY_TITLE),
+                presenter.text(ScreenSemantic.RECOMMENDATION_EMPTY_BODY),
+                presenter.text(ActionSemantic.CREATE_QUEST),
+                create,
+            )
             else Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                 Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("NEXT QUEST", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text(presenter.text(ScreenSemantic.NEXT_QUEST), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     Text(recommendation.quest.title, style = MaterialTheme.typography.headlineSmall)
-                    Text(recommendation.quest.meta(day), style = MaterialTheme.typography.bodyMedium)
-                    Text(recommendation.reasons.joinToString(" · ") { it.label() }, style = MaterialTheme.typography.bodySmall)
+                    Text(presenter.questMeta(recommendation.quest, day), style = MaterialTheme.typography.bodyMedium)
+                    Text(presenter.text(ScreenSemantic.RECOMMENDATION_REASONS, semanticArguments {
+                        put(SemanticParameters.RECOMMENDATION_REASONS, RecommendationReasons(recommendation.reasons))
+                    }), style = MaterialTheme.typography.bodySmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { open(recommendation.quest.id) }) { Text("查看任务") }
-                        TextButton(onClick = { complete(recommendation.quest.id) }, enabled = !state.busy) { Text("已完成") }
+                        Button(onClick = { open(recommendation.quest.id) }) { Text(presenter.text(ActionSemantic.VIEW_QUEST)) }
+                        TextButton(onClick = { complete(recommendation.quest.id) }, enabled = !state.busy) {
+                            Text(presenter.text(ActionSemantic.COMPLETE_QUEST, semanticArguments {
+                                put(SemanticParameters.COMPLETE_QUEST_LABEL,
+                                    CompleteQuestLabel(CompleteQuestLabelStyle.SHORT))
+                            }))
+                        }
                     }
-                    Text("本地规则推荐，不是 AI 判断。", style = MaterialTheme.typography.labelSmall)
+                    Text(presenter.text(ScreenSemantic.RECOMMENDATION_NOTICE), style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
         if (world.goals.none { !it.archived }) item {
-            EmptyState("给冒险一条主线", "把重要目标设为主线，再用小任务一步步推进。", "开启主线", { goal(null) })
+            EmptyState(presenter.text(ScreenSemantic.GOAL_EMPTY_TITLE), presenter.text(ScreenSemantic.GOAL_EMPTY_BODY),
+                presenter.text(ActionSemantic.CREATE_GOAL), { goal(null) })
         }
         if (revisit.isNotEmpty()) {
-            item { SectionTitle("重新决策", "多次暂缓不等于失败。拆小、暂停，或者放下它。") }
+            item { SectionTitle(presenter.text(ScreenSemantic.REVISIT_TITLE), presenter.text(ScreenSemantic.REVISIT_BODY)) }
             items(revisit, key = { "review-${it.id}" }) { q -> QuestCard(q, day, false, state.busy, { open(q.id) }, { complete(q.id) }) }
         }
-        item { SectionTitle("可执行任务 · ${active.size}", action = { TextButton(onClick = allQuests) { Text("全部") } }) }
-        if (active.isEmpty()) item { EmptyState("今日可以收工了", "没有需要现在执行的任务。休息也是正常的冒险节奏。") }
+        item { SectionTitle(presenter.text(ScreenSemantic.EXECUTABLE_QUESTS, semanticArguments {
+            put(SemanticParameters.COUNT, CountValue(active.size))
+        }), action = { TextButton(onClick = allQuests) { Text(presenter.text(ActionSemantic.VIEW_ALL)) } }) }
+        if (active.isEmpty()) item { EmptyState(
+            presenter.text(ScreenSemantic.WORK_DONE_TITLE), presenter.text(ScreenSemantic.WORK_DONE_BODY),
+        ) }
         items(active.sortedWith(compareByDescending<Quest> { it.priority }.thenBy { it.dueDay ?: Long.MAX_VALUE }).take(5), key = { it.id }) {
             q -> QuestCard(q, day, false, state.busy, { open(q.id) }, { complete(q.id) })
         }

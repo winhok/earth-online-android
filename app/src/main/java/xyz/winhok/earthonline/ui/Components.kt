@@ -71,26 +71,39 @@ fun EmptyState(title: String, body: String, actionText: String? = null, action: 
 @Composable
 fun QuestCard(quest: Quest, day: Long, done: Boolean, busy: Boolean,
               onOpen: () -> Unit, onComplete: () -> Unit) {
+    val presenter = LocalNarrativePresenter.current
     OutlinedCard(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(quest.title, style = MaterialTheme.typography.titleMedium,
                         maxLines = 3, overflow = TextOverflow.Ellipsis)
-                    Text(quest.meta(day), style = MaterialTheme.typography.bodySmall,
+                    Text(presenter.questMeta(quest, day), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (!done && quest.state == QuestState.ACTIVE) {
                     FilledTonalIconButton(onClick = onComplete, enabled = !busy && QuestRules.available(quest, day)) {
-                        Icon(Icons.Default.Check, contentDescription = "完成任务：${quest.title}")
+                        Icon(Icons.Default.Check, contentDescription = presenter.text(
+                            ActionSemantic.COMPLETE_QUEST,
+                            semanticArguments { put(
+                                SemanticParameters.COMPLETE_QUEST_LABEL,
+                                CompleteQuestLabel(CompleteQuestLabelStyle.ACCESSIBILITY, OpaqueText(quest.title)),
+                            ) },
+                        ))
                     }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(if (done) "已完成" else "+${QuestRules.reward(quest)} XP", style = MaterialTheme.typography.labelMedium,
+                Text(if (done) presenter.text(StateSemantic.COMPLETED) else presenter.text(
+                    ScreenSemantic.QUEST_REWARD,
+                    semanticArguments { put(SemanticParameters.XP, XpAmount(QuestRules.reward(quest))) },
+                ), style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary)
-                Text("P${4 - quest.priority} · ${quest.difficulty.label()}", style = MaterialTheme.typography.labelMedium)
-                if (quest.postponeCount >= 3 && !done) Text("待重审", style = MaterialTheme.typography.labelMedium,
+                Text(presenter.text(ScreenSemantic.QUEST_PRIORITY_DIFFICULTY, semanticArguments {
+                    put(SemanticParameters.QUEST_PRIORITY_DIFFICULTY,
+                        QuestPriorityDifficulty(4 - quest.priority, quest.difficulty))
+                }), style = MaterialTheme.typography.labelMedium)
+                if (quest.postponeCount >= 3 && !done) Text(presenter.text(StateSemantic.REVIEW_REQUIRED), style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary)
             }
         }
@@ -101,6 +114,7 @@ fun QuestCard(quest: Quest, day: Long, done: Boolean, busy: Boolean,
 @Composable
 fun EditorFrame(title: String, busy: Boolean, canSave: Boolean, onDismiss: () -> Unit, onSave: () -> Unit,
                 content: @Composable (PaddingValues) -> Unit) {
+    val presenter = LocalNarrativePresenter.current
     val snackbar = LocalEditorSnackbar.current
     // Opt in to insets so Android 8-11 use ADJUST_RESIZE rather than covering the form.
     Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(
@@ -129,10 +143,12 @@ fun EditorFrame(title: String, busy: Boolean, canSave: Boolean, onDismiss: () ->
                 topBar = {
                     TopAppBar(title = { Text(title) }, navigationIcon = {
                         IconButton(onClick = { finishEditing(onDismiss) }, enabled = !busy) {
-                            Icon(Icons.Default.Close, "关闭编辑")
+                            Icon(Icons.Default.Close, presenter.text(ScreenSemantic.CLOSE_EDITOR_ACCESSIBILITY))
                         }
                     }, actions = {
-                        TextButton(onClick = { finishEditing(onSave) }, enabled = canSave && !busy) { Text("保存") }
+                        TextButton(onClick = { finishEditing(onSave) }, enabled = canSave && !busy) {
+                            Text(presenter.text(ActionSemantic.SAVE))
+                        }
                     })
                 },
             ) { padding ->
