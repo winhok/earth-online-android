@@ -14,6 +14,7 @@ import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
 import xyz.winhok.earthonline.core.*
+import xyz.winhok.earthonline.data.deadlineState
 
 /** Real emulator display configurations; captures are not renders of a mock/design image. */
 @RunWith(AndroidJUnit4::class)
