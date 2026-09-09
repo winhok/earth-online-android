@@ -8,6 +8,14 @@
 
 手动依赖注入只有 Application → Database/Repository → ViewModel/Worker，避免 1.0 引入尚未需要的 DI 框架。不是将整个系统写成一个 Activity，也不为每个类堆空接口。
 
+## 叙事解释边界
+
+叙事体系是 `:core` 中的纯展示契约，不参与任务、奖励、债务、完成身份或持久化计算。`NarrativeRegistry` 使用稳定体系 ID 注册并整体验证 manifest；manifest 声明结构/内容版本、语言、明暗方案、能力矩阵、共享界面与目录继承，以及离线资源。每个稳定语义 ID 都必须明确标为直接目录、继承目录、共享界面或尚不可用；缺失或未声明的目录项不会在运行时静默混搭。
+
+应用自有表达通过稳定 `SemanticKey` 和类型化 `SemanticArguments` 进入目录，返回文案以及图标、颜色和效果角色。玩家名、服务器名、任务/主线标题、说明和手记使用 `OpaqueText`，解释器只能原样嵌入，禁止对最终字符串做全局替换。地球原生是默认内置定义；当前界面仍可与新目录并存，后续票据再逐屏迁移调用点。
+
+可选 `NarrativeSurfaceProvider` 只能读取不含 `World`、Room 或 Repository 的不可变 `NarrativeSurfaceState` 投影，并通过 `NarrativeActionSink` 发出稳定动作请求。自定义构图不是新的业务能力入口。
+
 ## 数据表
 
 | 表 | 关键字段 / 约束 |

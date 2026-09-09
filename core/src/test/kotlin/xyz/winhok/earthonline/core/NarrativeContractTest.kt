@@ -1,0 +1,437 @@
+package xyz.winhok.earthonline.core
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import org.junit.Test
+
+class NarrativeContractTest {
+    @Test
+    fun earthNativeInterpretsRepresentativeCompletionFromStructuredXp() {
+        val presentation = NarrativeRegistry.builtIns().interpret(
+            systemId = NarrativeSystemId.EARTH_NATIVE,
+            request = SemanticRequest(
+                key = NotificationSemantic.QUEST_COMPLETED,
+                arguments = semanticArguments {
+                    put(SemanticParameters.XP, XpAmount(25))
+                },
+            ),
+            locale = NarrativeLocale.ZH_CN,
+            scheme = NarrativeScheme.DARK,
+        )
+
+        assertEquals("任务完成 · +25 XP", presentation.text)
+        assertEquals(IconRole.COMPLETION, presentation.iconRole)
+        assertEquals(ColorRole.REWARD, presentation.colorRole)
+        assertEquals(EffectRole.COMPLETION, presentation.effectRole)
+    }
+
+    @Test
+    fun earthNativeManifestDeclaresVersionsMatrixInheritanceAndResources() {
+        val registry = NarrativeRegistry.builtIns()
+
+        registry.validate(NarrativeSystemId.EARTH_NATIVE)
+        val manifest = registry.manifest(NarrativeSystemId.EARTH_NATIVE)
+
+        assertEquals(NarrativeSystemId.EARTH_NATIVE, registry.defaultSystemId)
+        assertEquals("earth-native", manifest.id.wireId)
+        assertEquals(1, manifest.structureVersion)
+        assertEquals(1, manifest.contentVersion)
+        assertEquals(setOf(NarrativeLocale.ZH_CN), manifest.locales)
+        assertEquals(NarrativeScheme.entries.toSet(), manifest.schemes)
+        assertEquals(NarrativeCapability.entries.toSet(), manifest.capabilities.keys)
+        assertEquals(CapabilitySupport.INHERITED, manifest.capabilities.getValue(NarrativeCapability.SURFACE))
+        assertEquals(DestinationSemantic.entries.toSet(), manifest.inheritedSurfaces)
+        assertTrue(manifest.inheritedCatalogEntries.isEmpty())
+        assertEquals(NarrativeSemantics.all, manifest.semanticCapabilities.keys)
+        assertEquals(
+            SemanticAvailability.DIRECT_CATALOG,
+            manifest.semanticCapabilities.getValue(NotificationSemantic.QUEST_COMPLETED),
+        )
+        assertEquals(
+            SemanticAvailability.SHARED_SURFACE,
+            manifest.semanticCapabilities.getValue(ActionSemantic.COMPLETE_QUEST),
+        )
+        assertEquals(
+            SemanticAvailability.UNAVAILABLE,
+            manifest.semanticCapabilities.getValue(StateSemantic.CONTRACT_OVERDUE),
+        )
+        assertEquals(
+            SemanticAvailability.UNAVAILABLE,
+            manifest.semanticCapabilities.getValue(FieldSemantic.NARRATIVE_SYSTEM),
+        )
+        assertEquals(
+            setOf(ResourceKind.BRAND, ResourceKind.COLOR, ResourceKind.EFFECT),
+            manifest.resources.map { it.kind }.toSet(),
+        )
+        assertTrue(NotificationSemantic.QUEST_COMPLETED in manifest.catalogEntries)
+    }
+
+    @Test
+    fun everySemanticCategoryUsesUniqueStableWireIds() {
+        val expectedCategories = SemanticCategory.entries.toSet()
+        val grouped = NarrativeSemantics.all.groupBy { it.category }
+
+        assertEquals(expectedCategories, grouped.keys)
+        grouped.forEach { (category, keys) ->
+            assertTrue(keys.isNotEmpty())
+            assertTrue(keys.all { it.wireId.startsWith("${category.wirePrefix}.") })
+        }
+        assertEquals(NarrativeSemantics.all.size, NarrativeSemantics.all.map { it.wireId }.toSet().size)
+        assertEquals(RuleError.entries.toSet(), RuleError.entries.map { it.semantic().source }.toSet())
+        assertEquals(EventKind.entries.toSet(), EventKind.entries.map { it.semantic().source }.toSet())
+        assertEquals(
+            setOf("first_step", "ten_quests", "hundred_quests", "three_days", "seven_days", "boss_clear", "all_rounder"),
+            AchievementSemantic.entries.map { it.sourceId }.toSet(),
+        )
+    }
+
+    @Test
+    fun opaquePlayerContentIsPreservedAndInterpretationCannotChangeDomainFacts() {
+        val world = World(
+            player = Player(
+                name = "玩家“任务 XP”😀",
+                server = "服务器 XP任务",
+                zoneId = "Asia/Shanghai",
+                joinedAt = 1,
+                onboarded = true,
+            ),
+            goals = listOf(Goal("goal-1", "主线任务 XP", "主线说明\n😀", createdAt = 1)),
+            quests = listOf(Quest(
+                id = "quest-1",
+                title = "任务标题 XP 😀",
+                description = "说明\n\t任务 XP \"原样\"",
+                createdAt = 1,
+                updatedAt = 1,
+            )),
+            events = listOf(JournalEvent(
+                id = "event-1",
+                kind = EventKind.NOTE,
+                text = "手记任务 XP\n😀",
+                createdAt = 1,
+            )),
+        )
+        val before = world.copy()
+        val registry = NarrativeRegistry.builtIns()
+        val cases = listOf(
+            Triple(
+                ScreenSemantic.PLAYER_WELCOME,
+                semanticArguments { put(SemanticParameters.PLAYER_NAME, OpaqueText(world.player.name)) },
+                "${world.player.name}，欢迎上线",
+            ),
+            Triple(
+                ScreenSemantic.PROFILE_IDENTITY,
+                semanticArguments {
+                    put(SemanticParameters.SERVER_NAME, OpaqueText(world.player.server))
+                    put(SemanticParameters.LEVEL, LevelNumber(7))
+                },
+                "${world.player.server} · Lv.7",
+            ),
+            Triple(
+                ScreenSemantic.QUEST_CONTENT,
+                semanticArguments {
+                    put(SemanticParameters.TITLE, OpaqueText(world.quests.single().title))
+                    put(SemanticParameters.DESCRIPTION, OpaqueText(world.quests.single().description))
+                },
+                "${world.quests.single().title}\n${world.quests.single().description}",
+            ),
+            Triple(
+                ScreenSemantic.GOAL_CONTENT,
+                semanticArguments {
+                    put(SemanticParameters.TITLE, OpaqueText(world.goals.single().title))
+                    put(SemanticParameters.DESCRIPTION, OpaqueText(world.goals.single().description))
+                },
+                "${world.goals.single().title}\n${world.goals.single().description}",
+            ),
+            Triple(
+                ScreenSemantic.NOTE_CONTENT,
+                semanticArguments {
+                    put(SemanticParameters.NOTE, OpaqueText(world.events.single().text))
+                },
+                world.events.single().text,
+            ),
+        )
+
+        cases.forEach { (key, arguments, expected) ->
+            assertEquals(
+                expected,
+                registry.interpret(
+                    NarrativeSystemId.EARTH_NATIVE,
+                    SemanticRequest(key, arguments),
+                    NarrativeLocale.ZH_CN,
+                    NarrativeScheme.DARK,
+                ).text,
+            )
+        }
+        assertEquals(before, world)
+    }
+
+    @Test
+    fun optionalSurfaceProviderReadsProjectionAndDispatchesStableActionsOnly() {
+        val state = NarrativeSurfaceState(
+            destination = DestinationSemantic.QUESTS,
+            busy = false,
+            items = listOf(NarrativeSurfaceItem(
+                id = "quest-1",
+                presentation = NarrativePresentation("任务标题"),
+                actions = setOf(ActionSemantic.VIEW_QUEST),
+            )),
+        )
+        val dispatched = mutableListOf<NarrativeActionRequest>()
+        val provider = object : NarrativeSurfaceProvider<String> {
+            override val surfaces = setOf(DestinationSemantic.QUESTS)
+            override fun provide(
+                state: NarrativeSurfaceState,
+                actions: NarrativeActionSink,
+            ): String {
+                val item = state.items.single()
+                actions.dispatch(NarrativeActionRequest(ActionSemantic.VIEW_QUEST, item.id))
+                return item.presentation.text
+            }
+        }
+
+        val rendered = provider.provide(state, NarrativeActionSink(dispatched::add))
+
+        assertEquals("任务标题", rendered)
+        assertEquals(setOf(DestinationSemantic.QUESTS), provider.surfaces)
+        assertEquals(
+            listOf(NarrativeActionRequest(ActionSemantic.VIEW_QUEST, "quest-1")),
+            dispatched,
+        )
+    }
+
+    @Test
+    fun extensibleRegistryRejectsIncompleteDefinitionsBeforeRegistration() {
+        val builtIns = NarrativeRegistry.builtIns()
+        val earthNative = builtIns.definition(NarrativeSystemId.EARTH_NATIVE)
+        val manifest = earthNative.manifest
+        val invalidDefinitions = listOf(
+            earthNative.copy(manifest = manifest.copy(structureVersion = 0)),
+            earthNative.copy(manifest = manifest.copy(contentVersion = 0)),
+            earthNative.copy(manifest = manifest.copy(locales = emptySet())),
+            earthNative.copy(manifest = manifest.copy(schemes = setOf(NarrativeScheme.DARK))),
+            earthNative.copy(manifest = manifest.copy(
+                capabilities = manifest.capabilities - NarrativeCapability.EFFECT,
+            )),
+            earthNative.copy(manifest = manifest.copy(
+                capabilities = manifest.capabilities +
+                    (NarrativeCapability.TEXT to CapabilitySupport.UNSUPPORTED),
+            )),
+            earthNative.copy(manifest = manifest.copy(resources = emptySet())),
+            earthNative.copy(manifest = manifest.copy(resources = setOf(
+                NarrativeResource("duplicate", ResourceKind.BRAND),
+                NarrativeResource("duplicate", ResourceKind.COLOR, NarrativeScheme.entries.toSet()),
+                NarrativeResource("effect", ResourceKind.EFFECT),
+            ))),
+            earthNative.copy(manifest = manifest.copy(catalogEntries = emptySet())),
+            earthNative.copy(manifest = manifest.copy(
+                semanticCapabilities = manifest.semanticCapabilities - ActionSemantic.SAVE,
+            )),
+            earthNative.copy(manifest = manifest.copy(inheritedSurfaces = emptySet())),
+        )
+
+        invalidDefinitions.forEach { definition ->
+            expectIllegalArgument {
+                NarrativeRegistry.create(
+                    defaultSystemId = NarrativeSystemId.EARTH_NATIVE,
+                    definitions = listOf(definition),
+                )
+            }
+        }
+        expectIllegalArgument {
+            NarrativeRegistry.create(NarrativeSystemId.of("missing"), listOf(earthNative))
+        }
+        expectIllegalArgument {
+            NarrativeRegistry.create(
+                NarrativeSystemId.EARTH_NATIVE,
+                listOf(earthNative, earthNative),
+            )
+        }
+    }
+
+    @Test
+    fun semanticRequestsRejectMissingOrUnexpectedParameters() {
+        val registry = NarrativeRegistry.builtIns()
+        expectIllegalArgument {
+            registry.interpret(
+                NarrativeSystemId.EARTH_NATIVE,
+                SemanticRequest(NotificationSemantic.QUEST_COMPLETED),
+                NarrativeLocale.ZH_CN,
+                NarrativeScheme.LIGHT,
+            )
+        }
+        expectIllegalArgument {
+            registry.interpret(
+                NarrativeSystemId.EARTH_NATIVE,
+                SemanticRequest(
+                    NotificationSemantic.QUEST_COMPLETED,
+                    semanticArguments {
+                        put(SemanticParameters.XP, XpAmount(25))
+                        put(SemanticParameters.PLAYER_NAME, OpaqueText("额外参数"))
+                    },
+                ),
+                NarrativeLocale.ZH_CN,
+                NarrativeScheme.LIGHT,
+            )
+        }
+    }
+
+    @Test
+    fun declaredCatalogInheritanceResolvesThroughTheDefaultSystemOnly() {
+        val builtIns = NarrativeRegistry.builtIns()
+        val earthNative = builtIns.definition(NarrativeSystemId.EARTH_NATIVE)
+        val inheritedId = NarrativeSystemId.of("inherited-test")
+        val inherited = NarrativeSystemDefinition(
+            manifest = earthNative.manifest.copy(
+                id = inheritedId,
+                capabilities = NarrativeCapability.entries.associateWith { CapabilitySupport.INHERITED },
+                semanticCapabilities = earthNative.manifest.semanticCapabilities.mapValues { (key, value) ->
+                    when {
+                        key == NotificationSemantic.QUEST_COMPLETED -> SemanticAvailability.INHERITED_CATALOG
+                        value == SemanticAvailability.DIRECT_CATALOG -> SemanticAvailability.SHARED_SURFACE
+                        else -> value
+                    }
+                },
+                catalogEntries = emptySet(),
+                inheritedCatalogEntries = setOf(NotificationSemantic.QUEST_COMPLETED),
+            ),
+            catalog = NarrativeCatalog(emptyMap()),
+        )
+        val registry = NarrativeRegistry.create(
+            NarrativeSystemId.EARTH_NATIVE,
+            listOf(earthNative, inherited),
+        )
+
+        val presentation = registry.interpret(
+            inheritedId,
+            SemanticRequest(
+                NotificationSemantic.QUEST_COMPLETED,
+                semanticArguments { put(SemanticParameters.XP, XpAmount(25)) },
+            ),
+            NarrativeLocale.ZH_CN,
+            NarrativeScheme.LIGHT,
+        )
+
+        assertEquals("任务完成 · +25 XP", presentation.text)
+    }
+
+    @Test
+    fun interpretationLeavesCompletionProgressAndV2FactsExactlyEqual() {
+        val quest = Quest(id = "quest-1", title = "任务 XP", createdAt = 1, updatedAt = 1)
+        val completion = Completion(
+            id = "quest-1:once",
+            questId = quest.id,
+            occurrence = "once",
+            title = quest.title,
+            kind = quest.kind,
+            skill = quest.skill,
+            xp = 25,
+            completedAt = 2,
+            completedDay = 20_000,
+        )
+        val world = World(
+            player = Player(
+                name = "玩家",
+                zoneId = "Asia/Shanghai",
+                joinedAt = 1,
+                onboarded = true,
+            ),
+            quests = listOf(quest),
+            completions = listOf(completion),
+        )
+        val graph = BackupV2Graph(
+            narrativePreference = TestNarrativePreference("earth-native"),
+            contracts = listOf(TestContract(questId = quest.id)),
+            contractRevisions = emptyList(),
+            consequences = listOf(TestConsequence()),
+            consequenceAdjustments = emptyList(),
+            repaymentAllocations = listOf(TestAllocation(completionId = completion.id)),
+            clockBoundaries = emptyList(),
+            recoveryRoutes = listOf(TestRecoveryRoute()),
+            recoveryNodes = listOf(TestRecoveryNode(questId = quest.id)),
+        )
+        val worldBefore = world.copy()
+        val graphBefore = graph.copy()
+        val progressBefore = ProgressRules.total(world.completions)
+        val achievementsBefore = ProgressRules.achievements(world)
+
+        NarrativeRegistry.builtIns().interpret(
+            NarrativeSystemId.EARTH_NATIVE,
+            SemanticRequest(
+                NotificationSemantic.QUEST_COMPLETED,
+                semanticArguments { put(SemanticParameters.XP, XpAmount(completion.xp)) },
+            ),
+            NarrativeLocale.ZH_CN,
+            NarrativeScheme.DARK,
+        )
+
+        assertEquals(worldBefore, world)
+        assertEquals(graphBefore, graph)
+        assertEquals(progressBefore, ProgressRules.total(world.completions))
+        assertEquals(achievementsBefore, ProgressRules.achievements(world))
+    }
+
+    private data class TestNarrativePreference(
+        override val narrativeId: String,
+        override val playerId: Int = 1,
+    ) : NarrativePreferenceRecord
+
+    private data class TestContract(
+        override val questId: String,
+        override val id: String = "contract-1",
+        override val occurrence: String = "once",
+        override val zoneId: String = "Asia/Shanghai",
+        override val dueDay: Long = 20_001,
+        override val originalRewardXp: Long = 25,
+        override val currentRewardXp: Long = 25,
+        override val status: String = "OVERDUE",
+        override val signedAt: Long = 1,
+        override val closedAt: Long? = 2,
+    ) : ContractRecord
+
+    private data class TestConsequence(
+        override val id: String = "consequence-1",
+        override val contractId: String = "contract-1",
+        override val kind: String = "OVERDUE",
+        override val xp: Long = 25,
+        override val effectiveDay: Long = 20_002,
+        override val createdAt: Long = 2,
+        override val idempotencyKey: String = "consequence:1",
+    ) : ConsequenceRecord
+
+    private data class TestAllocation(
+        override val completionId: String,
+        override val id: String = "allocation-1",
+        override val consequenceId: String = "consequence-1",
+        override val xp: Long = 20,
+        override val createdAt: Long = 3,
+        override val idempotencyKey: String = "allocation:1",
+    ) : RepaymentAllocationRecord
+
+    private data class TestRecoveryRoute(
+        override val id: String = "route-1",
+        override val status: String = "CLOSED",
+        override val triggerKind: String = "DEBT_LEVEL",
+        override val targetDebtXp: Long = 20,
+        override val openedAt: Long = 4,
+        override val closedAt: Long? = 5,
+        override val idempotencyKey: String = "route:1",
+    ) : RecoveryRouteRecord
+
+    private data class TestRecoveryNode(
+        override val questId: String,
+        override val routeId: String = "route-1",
+        override val position: Int = 0,
+        override val addedAt: Long = 4,
+        override val completedAt: Long? = 5,
+    ) : RecoveryNodeRecord
+
+    private fun expectIllegalArgument(block: () -> Unit) {
+        try {
+            block()
+            fail("Expected IllegalArgumentException")
+        } catch (_: IllegalArgumentException) {
+            // Expected rejection at the public contract boundary.
+        }
+    }
+}
