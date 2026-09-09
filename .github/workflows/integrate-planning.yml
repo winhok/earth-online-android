@@ -1,0 +1,32 @@
+name: Preserve updated delivery plan
+on:
+  push:
+    branches: ['release/1.5.0-completion']
+    paths: ['.github/workflows/integrate-planning.yml']
+permissions:
+  contents: write
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Merge the inspected main commits without rewriting history
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git cat-file -e 38889eae8e7497cdba191eb5bd692d542d915ca4
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' merge --no-ff 38889eae8e7497cdba191eb5bd692d542d915ca4 -m 'merge: preserve all 17 delivery tickets, design evidence and official Gradle wrapper'
+          git push origin HEAD:refs/heads/release/1.5.0-completion
+          mkdir -p /tmp/earth-updated
+          git archive --format=zip HEAD -o /tmp/earth-updated/source.zip
+          git rev-parse HEAD > /tmp/earth-updated/source-commit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: merged-v15-source
+          path: /tmp/earth-updated/
+          if-no-files-found: error
+          retention-days: 7
