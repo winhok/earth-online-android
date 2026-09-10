@@ -150,15 +150,14 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        env:
+          ANDROID_TEST_NOT_CLASS: ${{ matrix.api == 26 && 'xyz.winhok.earthonline.VisualAcceptanceTest' || '' }}
         with:
           api-level: ${{ matrix.api }}
           arch: x86_64
           profile: pixel_2
           disable-animations: true
           script: |
-            if [ '${{ matrix.api }}' = '26' ]; then
-              export ANDROID_TEST_NOT_CLASS=xyz.winhok.earthonline.VisualAcceptanceTest
-            fi
             bash scripts/emulator-acceptance.sh
             python3 scripts/release-v15-smoke.py release-output/earth-online-1.5.0.apk old-release/earth-online-1.0.0.apk
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
