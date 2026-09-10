@@ -187,7 +187,21 @@ fun QuestsScreen(state: EarthUiState, create: () -> Unit, open: (String) -> Unit
         }
         if (!cultivationSurface) {
             item { NarrativeQuickSwitch(state.narrativeSystemId, state.busy, switchNarrative) }
-            item { SectionTitle(presenter.text(ScreenSemantic.QUESTS_TITLE), presenter.text(ScreenSemantic.QUESTS_BODY)) }
+            item {
+                SectionTitle(
+                    presenter.text(ScreenSemantic.QUESTS_TITLE),
+                    presenter.text(ScreenSemantic.QUESTS_BODY),
+                    action = {
+                        TextButton(
+                            onClick = create,
+                            enabled = !state.busy,
+                            modifier = Modifier.testTag("quest-create"),
+                        ) {
+                            Text(presenter.text(ActionSemantic.CREATE_QUEST))
+                        }
+                    },
+                )
+            }
             item { OutlinedTextField(query, { query = it.take(120) }, label = { Text(presenter.text(FieldSemantic.QUEST_SEARCH)) },
                 modifier = Modifier.fillMaxWidth(), singleLine = true) }
             item {

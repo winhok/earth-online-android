@@ -58,14 +58,18 @@ def set_text(field,text):
 
 
 def pick_file(name):
-    for attempt in range(3):
+    for attempt in range(12):
         root=ui.dump()
         found=[n for n in root.iter('node') if n.get('text')==name]
         if found: ui.tap(found[-1]);return
-        roots=[n for n in root.iter('node') if any(x in ('Show roots','显示根目录','显示根目录列表') for x in ui.labels(n))]
-        if roots: ui.tap(roots[0])
-        downloads=ui.nodes(lambda n:n.get('text') in ('Downloads','下载'),seconds=8)
-        ui.tap(downloads[-1])
+        if attempt == 0:
+            roots=[n for n in root.iter('node') if any(x in ('Show roots','显示根目录','显示根目录列表') for x in ui.labels(n))]
+            if roots: ui.tap(roots[0])
+            downloads=ui.nodes(lambda n:n.get('text') in ('Downloads','下载'),seconds=8)
+            ui.tap(downloads[-1])
+            continue
+        w,h=map(int,re.findall(r'(\d+)x(\d+)',ui.adb('shell','wm','size'))[-1])
+        ui.adb('shell','input','swipe',str(w//2),str(int(h*.78)),str(w//2),str(int(h*.28)),'300')
     raise AssertionError('Document picker could not find '+name)
 
 
@@ -87,15 +91,18 @@ def restore_file(file:Path,*,cancel=False,overdue=False):
 
 
 def export_file(stage):
-    settings();ui.click('导出存档',scroll=True)
     name='earth-online-'+stage+'.json'
+    remote='/sdcard/Download/'+name
+    # Repeated local verification must never pull an older file with the same evidence name.
+    ui.adb('shell','rm','-f',remote)
+    settings();ui.click('导出存档',scroll=True)
     field=ui.nodes(lambda n:n.get('class')=='android.widget.EditText')[-1]
     set_text(field,name);ui.hide_keyboard()
     save=ui.nodes(lambda n:n.get('text','').upper()=='SAVE' or n.get('text')=='保存')[-1]
     ui.tap(save)
     ui.nodes(lambda n:any(t.startswith('存档已导出') for t in ui.labels(n)))
     file=OUT/name
-    ui.adb('pull','/sdcard/Download/'+name,str(file))
+    ui.adb('pull',remote,str(file))
     envelope=json.loads(file.read_text())
     assert hashlib.sha256(envelope['payload'].encode()).hexdigest()==envelope['sha256']
     data=json.loads(envelope['payload'])
