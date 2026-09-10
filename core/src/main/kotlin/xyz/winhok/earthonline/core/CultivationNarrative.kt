@@ -96,6 +96,8 @@ internal object CultivationNarrative {
         ScreenSemantic.RECOMMENDATION_NOTICE to textEntry("本地规则推演，不是 AI 占卜。"),
         ScreenSemantic.QUESTS_TITLE to textEntry("历练玉简"),
         ScreenSemantic.QUESTS_BODY to textEntry("仙途指引方向，历练落于现实行动。"),
+        ScreenSemantic.QUEST_TRACK_TITLE to textEntry("修行轨迹"),
+        ScreenSemantic.QUEST_TRACK_BODY to textEntry("行于日常，完成、待行与劫痕都有真实来路。"),
         ScreenSemantic.QUEST_KIND_SIDE to textEntry("支线历练"),
         ScreenSemantic.QUEST_KIND_DAILY to textEntry("日课"),
         ScreenSemantic.QUEST_KIND_BOSS to textEntry("渡劫"),

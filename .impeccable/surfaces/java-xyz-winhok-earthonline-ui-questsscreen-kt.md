@@ -37,3 +37,11 @@ FIRST VIEWPORT: 顶部体系切换和大胆境界数值，中部主玉简占最�
 FORM: 战令修行轨，候选序列第 3 项，surface seed `851ec319`，批准构图 `v2-battle-pass.webp`。
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+## Finish review
+
+- Implemented on 2026-09-10 with the approved `v2-battle-pass.webp` hierarchy: the normal phone viewport reaches the real quest track, and widths at or above 720dp use a 42/58 realm-and-contract split rather than a stretched phone column.
+- The highlighted contract and ordinary quest cards share one 88dp right-swipe completion threshold, reduced-motion behavior, haptic threshold signal, visible completion control, and accessibility action.
+- Overdue contracts use explicit error text plus an open-recovery action; they do not expose the ordinary postpone path. Search and filters expand directly below the track heading before any track rows.
+- Actual Activity/Room/Compose acceptance covered dark and light phones, 200% font, dark and light tablet layouts, rotation draft preservation, swipe completion, immediate search, overdue recovery, and narrative-switch scroll anchoring.
+- Independent finish verdict: **PASS**. All five prior P1 findings (first viewport, highlighted swipe, overdue recovery, search reachability, and true wide layout) were closed before release gating.

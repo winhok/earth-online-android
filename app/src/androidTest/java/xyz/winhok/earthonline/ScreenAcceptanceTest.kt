@@ -105,7 +105,7 @@ class ScreenAcceptanceTest {
         }
         assertEquals(ThemeMode.LIGHT, runBlocking { repo.snapshot().player.theme })
         listOf(
-            "历练" to "历练玉简",
+            "历练" to "修行轨迹",
             "境界" to "修行境界",
             "修行志" to "每次行动与选择都留下可追溯的道痕。",
             "洞天" to "下一项宗门任务",
@@ -139,6 +139,8 @@ class ScreenAcceptanceTest {
             compose.onAllNodesWithText("历练").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText(lastTitle).assertIsDisplayed()
+        compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-search-toggle"))
+        compose.onNodeWithTag("quest-search-toggle").performClick()
         compose.onNodeWithTag("quests-list").performScrollToNode(
             hasTestTag("quest-filter-state.active"),
         )

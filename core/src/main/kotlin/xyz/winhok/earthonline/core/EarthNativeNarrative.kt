@@ -185,6 +185,8 @@ internal object EarthNativeNarrative {
             ScreenSemantic.WORK_DONE_BODY to textEntry("没有需要现在执行的任务。休息也是正常的冒险节奏。"),
             ScreenSemantic.QUESTS_TITLE to textEntry("任务日志"),
             ScreenSemantic.QUESTS_BODY to textEntry("主线指引方向，支线负责行动。"),
+            ScreenSemantic.QUEST_TRACK_TITLE to textEntry("任务进度"),
+            ScreenSemantic.QUEST_TRACK_BODY to textEntry("完成、待办与逾期责任都来自同一份真实记录。"),
             FieldSemantic.QUEST_SEARCH to textEntry("搜索任务或主线"),
             StateSemantic.LOADING to textEntry("正在读取存档"),
             StateSemantic.LOAD_ERROR to textEntry("存档读取失败", IconRole.ERROR),

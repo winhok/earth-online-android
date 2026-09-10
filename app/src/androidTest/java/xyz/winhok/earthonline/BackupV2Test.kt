@@ -139,6 +139,48 @@ class BackupV2Test {
     }
 
     @Test
+    fun v2BackupWithAttenuatedCompletionRewardRemainsImportable() {
+        val source = completeSnapshot().let { snapshot ->
+            snapshot.copy(
+                world = snapshot.world.copy(
+                    completions = snapshot.world.completions.map { it.copy(xp = 20) },
+                    events = snapshot.world.events.map { it.copy(xp = 20) },
+                ),
+                contracts = snapshot.contracts.map {
+                    it.copy(status = "FULFILLED", closedAt = 1_000)
+                },
+                consequences = emptyList(),
+                consequenceAdjustments = emptyList(),
+                repaymentAllocations = emptyList(),
+                recoveryRoutes = emptyList(),
+                recoveryNodes = emptyList(),
+            )
+        }
+        val encoded = JSONObject(BackupCodec.encode(source, now = 2_000))
+        val payload = JSONObject(encoded.getString("payload"))
+        payload.getJSONArray("contracts").getJSONObject(0).apply {
+            remove("signedKind")
+            remove("signedSkill")
+            remove("extensionCount")
+            remove("fulfilledAt")
+            remove("activeQuestId")
+            remove("titleSnapshot")
+        }
+        payload.remove("settlementReceipts")
+        payload.remove("progressHistory")
+        payload.remove("effects")
+        payload.remove("presentationPreferences")
+        val raw = payload.toString()
+        encoded.put("version", 2).put("payload", raw).put("sha256", sha256(raw))
+
+        val decoded = BackupCodec.decodeSnapshot(encoded.toString())
+
+        assertEquals(20, decoded.world.completions.single().xp)
+        assertEquals(20L, decoded.contracts.single().currentRewardXp)
+        assertEquals(1, decoded.contracts.single().extensionCount)
+    }
+
+    @Test
     fun unknownNarrativeIdIsPreservedButFallsBackForDisplay() {
         val unknownId = "third-party.future"
         val snapshot = completeSnapshot().copy(

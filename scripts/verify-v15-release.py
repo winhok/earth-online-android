@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import xml.etree.ElementTree as ET
+import re
 from pathlib import Path
 
 CHECKS={
@@ -35,6 +36,16 @@ def cases(root):
     return out
 
 
+def scenario_count(root, marker):
+    values=[]
+    pattern=re.compile(rf'{re.escape(marker)}=(\d+)')
+    for file in root.rglob('TEST-*.xml'):
+        values.extend(int(value) for value in pattern.findall(file.read_text()))
+    assert len(values)==1,f'Expected one {marker} marker in core evidence, got {values}'
+    assert values[0]>0,f'Invalid {marker}: {values[0]}'
+    return values[0]
+
+
 def main():
     packages,evidence,build=map(Path,sys.argv[1:4])
     apk=packages/'earth-online-1.5.0.apk'
@@ -43,8 +54,10 @@ def main():
     assert len(core)>=19
     assert any('DeadlineTest' in (c or '') for c,n in core)
     assert any('DomainTest' in (c or '') for c,n in core)
+    core_root=build/'core/build/test-results'
     summary=dict(version='1.5.0',source_commit=(packages/'source-commit.txt').read_text().strip(),
-        apk_sha256=sha,domain_scenarios=41,contract_scenarios=45,
+        apk_sha256=sha,domain_scenarios=scenario_count(core_root,'EARTH_DOMAIN_SCENARIOS'),
+        contract_scenarios=scenario_count(core_root,'EARTH_CONTRACT_SCENARIOS'),
         core_junit_cases=len(core),devices=[],physical_device_tested=False,store_published=False)
     manifests=(packages/'apk-manifest-summary.txt').read_text()
     assert "versionName='1.5.0'" in manifests and "versionCode='2'" in manifests
@@ -53,7 +66,7 @@ def main():
     for api in (26,29,35,36):
         root=evidence/f'v15-release-api-{api}'
         tests=cases(root/'app/build/outputs/androidTest-results')
-        assert len(tests)==65,f'Expected 65 real instrumentation cases on API {api}, got {len(tests)}'
+        assert len(tests)==68,f'Expected 68 real instrumentation cases on API {api}, got {len(tests)}'
         for name in ('ContractJourneyTest','VisualAcceptanceTest','ReleaseFixtureTest'):
             assert any(name in (c or '') for c,n in tests),name
         signed=root/'verification/v15-release'

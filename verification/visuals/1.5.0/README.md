@@ -2,4 +2,4 @@
 
 Captured by VisualAcceptanceTest and ContractJourneyTest on Android API 35. These are emulator screenshots, not mockups. See provenance.json for source identity and SHA-256. 65 instrumentation tests passed in run 34402800774.
 
-The approved direction remains .impeccable/mocks/decision/assigned.webp. Compare the two phone themes, 200% text, tablet themes, rotated editor, real deadline disclosure, batch settlement and recovery end-state.
+These captures document an earlier implementation checkpoint. The approved final direction is `.impeccable/mocks/decision/v2-battle-pass.webp`; the release-candidate workflow regenerates exact-source phone, 200% text, tablet, rotated-editor, deadline, settlement, and recovery evidence on API 26 / 29 / 35 / 36 before an artifact can be published.

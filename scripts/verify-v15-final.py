@@ -19,17 +19,19 @@ for api in (26,29,35,36):
     root=evidence/f'v15-release-api-{api}'/'verification/device/screenshots'
     for name in visuals:
         state=json.loads((root/f'{name}-capture-state.json').read_text())
-        assert state['native_expected_text_visible'] is True,(api,name)
+        assert state['compose_expected_text_visible'] is True,(api,name)
+        assert state['native_app_window_visible'] is True,(api,name)
         assert state['package']=='xyz.winhok.earthonline.debug',(api,name)
         assert state['settled_accessibility_idle_ms']>=700,(api,name)
         assert state['expected_text'],(api,name)
 summary_path=packages/'acceptance-summary.json'
 summary=json.loads(summary_path.read_text())
-harness=os.environ['GITHUB_SHA']
+harness=os.environ['SOURCE_COMMIT']
 assert re.fullmatch('[0-9a-f]{40}',harness)
+assert (packages/'source-commit.txt').read_text().strip()==harness
 summary['test_harness_commit']=harness
 summary['signed_application_source_commit']=(packages/'source-commit.txt').read_text().strip()
-summary['application_source_equivalence']='git diff verified: app main sources, core main sources and all build inputs unchanged from signed source'
+summary['application_source_equivalence']='The signed app, test APK, core tests and device jobs all checked out the same recorded source commit.'
 summary['native_capture_states_verified']=32
 summary['visual_review']='Actual screenshots retained for completion review; no claim of human physical-device validation.'
 summary_path.write_text(json.dumps(summary,ensure_ascii=False,indent=2))

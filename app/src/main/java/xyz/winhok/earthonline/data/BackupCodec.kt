@@ -161,7 +161,6 @@ object BackupCodec {
                 EventKind.valueOf(e.strictString("kind")), e.strictString("text"), e.strictLong("createdAt"),
                 e.nullString("questId"), e.strictInt("xp")) },
         )
-        if (version <= 2) BackupValidator.validate(world)
         if (version == LEGACY_VERSION) return BackupSnapshot(world).also(BackupSnapshotValidator::validate)
 
         val preference = data.getJSONObject("narrativePreference")

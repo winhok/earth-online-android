@@ -94,7 +94,7 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
                 if (ready && !wide) PrimaryNavigation(tab, expanded = false) { tab = it }
             },
             floatingActionButton = {
-                if (ready && (tab == 0 || tab == 1)) ExtendedFloatingActionButton(onClick = create,
+                if (ready && tab == 0) ExtendedFloatingActionButton(onClick = create,
                     modifier = Modifier.testTag("create-quest").semantics {
                         contentDescription = presenter.text(ActionSemantic.CREATE_QUEST)
                     },
@@ -128,7 +128,16 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
                             else -> holder.SaveableStateProvider(tab) {
                                 when (tab) {
                                     0 -> DashboardScreen(state, create, { detailId = it }, model::complete, { tab = 1 }, openGoal, { ledgerOpen = true })
-                                    1 -> QuestsScreen(state, create, { detailId = it }, model::complete, openGoal, model::archiveGoal)
+                                    1 -> QuestsScreen(
+                                        state,
+                                        create,
+                                        { detailId = it },
+                                        model::complete,
+                                        openGoal,
+                                        model::archiveGoal,
+                                        model::switchNarrative,
+                                        { ledgerOpen = true },
+                                    )
                                     2 -> CharacterScreen(state, model, { ledgerOpen = true })
                                     3 -> JournalScreen(state, { noteOpen = true }, { ledgerOpen = true })
                                 }
@@ -177,6 +186,7 @@ fun PrimaryNavigation(
 ) {
     val presenter = LocalNarrativePresenter.current
     val presentations = DestinationSemantic.entries.map { presenter.present(it) }
+    val showEveryLabel = androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.5f
     if (expanded) {
         NavigationRail {
             presentations.forEachIndexed { index, presentation ->
@@ -196,6 +206,7 @@ fun PrimaryNavigation(
                     onClick = { onSelect(index) },
                     icon = { Icon(presentation.iconRole.navigationIcon(), null) },
                     label = { Text(presentation.text) },
+                    alwaysShowLabel = showEveryLabel,
                 )
             }
         }

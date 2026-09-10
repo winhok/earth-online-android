@@ -22,9 +22,9 @@ EXPECTED_CERT='447baf2063785d0e45d1f267c8b8a3fb1904f7b33d88bef6cf0f922aa0b017bd'
 PRIVATE=Path(os.environ['RUNNER_TEMP'])/'v15-private-signing'
 PUBLIC=Path(os.environ['RUNNER_TEMP'])/'v15-public-recipient'
 RUN=os.environ['GITHUB_RUN_ID']
-SOURCE=os.environ['GITHUB_SHA']
+SOURCE=os.environ['SOURCE_COMMIT']
 REPO=os.environ['GITHUB_REPOSITORY']
-BRANCH='release/1.5.0-completion'
+BRANCH=os.environ['HANDOFF_REF']
 
 
 def run(*args,**kwargs):
@@ -101,6 +101,7 @@ def receive():
 
 if __name__=='__main__':
     assert re.fullmatch('[0-9a-f]{40}',SOURCE) and RUN.isdigit()
+    assert BRANCH=='release/1.5.0-completion'
     if sys.argv[1]=='prepare':prepare()
     elif sys.argv[1]=='receive':receive()
     else:raise SystemExit('Use prepare or receive')

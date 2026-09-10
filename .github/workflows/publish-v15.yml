@@ -1,47 +1,60 @@
-name: Verify and publish Android 1.5.0
+name: Build and verify Android 1.5.0 candidate
+
 on:
-  push:
-    branches: ['release/1.5.0-completion']
-    paths: ['.github/workflows/publish-v15.yml']
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
 permissions:
   contents: read
+  actions: read
+
 concurrency:
-  group: earth-v15-release
+  group: earth-v15-release-candidate
   cancel-in-progress: false
+
+env:
+  VERSION_NAME: '1.5.0'
+  VERSION_CODE: '2'
+  SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+  HANDOFF_REF: ${{ github.event.pull_request.head.ref || 'release/1.5.0-completion' }}
+
 jobs:
   package:
-    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'release-candidate'
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
-      VERSION_NAME: '1.5.0'
-      VERSION_CODE: '2'
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+          persist-credentials: false
       - name: Refuse to replace an existing release
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > /tmp/releases.json
-          python3 -c "import json; assert not any(r['tag_name']=='v1.5.0' for r in json.load(open('/tmp/releases.json')))"
-      - uses: actions/setup-java@v4
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v1.5.0" >/dev/null 2>&1; then
+            echo 'Release v1.5.0 already exists; refusing to rebuild a second candidate.' >&2
+            exit 1
+          fi
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.13'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
-      - name: Verify domain, narrative, lint and test compilation
-        run: |
-          set -o pipefail
-          ./gradlew :core:test :app:lintDebug :app:lintRelease :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee /tmp/build.log
-      - name: Create this run's temporary encrypted-transfer recipient
+      - name: Verify source, lint, unsigned release and test APK compilation
+        run: ./gradlew :core:test :app:lintDebug :app:lintRelease :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest --stacktrace
+      - name: Create this run's one-day encrypted-transfer recipient
         run: python3 scripts/receive-signing.py prepare
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: v15-signing-recipient
           path: ${{ runner.temp }}/v15-public-recipient/
@@ -63,18 +76,21 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs release-output/earth-online-1.5.0.apk > release-output/apk-signature-verification.txt
           grep -q '447baf2063785d0e45d1f267c8b8a3fb1904f7b33d88bef6cf0f922aa0b017bd' release-output/apk-signature-verification.txt
           jarsigner -verify release-output/earth-online-1.5.0.aab > release-output/bundle-signature-verification.txt
+          keytool -printcert -jarfile release-output/earth-online-1.5.0.aab > release-output/bundle-signing-certificate.txt
+          AAB_CERT_SHA256="$(sed -n 's/^[[:space:]]*SHA256: //p' release-output/bundle-signing-certificate.txt | head -n 1 | tr -d ':' | tr 'A-F' 'a-f')"
+          test "$AAB_CERT_SHA256" = '447baf2063785d0e45d1f267c8b8a3fb1904f7b33d88bef6cf0f922aa0b017bd'
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging release-output/earth-online-1.5.0.apk > release-output/apk-manifest-summary.txt
           ! grep -q "uses-permission: name='android.permission.INTERNET'" release-output/apk-manifest-summary.txt
           ! grep -q 'application-debuggable' release-output/apk-manifest-summary.txt
-          printf '%s\n' "$GITHUB_SHA" > release-output/source-commit.txt
+          printf '%s\n' "$SOURCE_COMMIT" > release-output/source-commit.txt
           (cd release-output && sha256sum earth-online-1.5.0.apk earth-online-1.5.0.aab mapping.txt > SHA256SUMS.txt)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: v15-signed-packages
           path: release-output/
           retention-days: 30
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: v15-release-build-evidence
@@ -86,17 +102,21 @@ jobs:
       - name: Remove all temporary private signing material
         if: always()
         run: rm -rf "$RUNNER_TEMP/v15-private-signing" "$RUNNER_TEMP/v15-public-recipient"
+
   device:
     needs: package
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
-        api: [26,29,35,36]
+        api: [26, 29, 35, 36]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: v15-signed-packages
           path: release-output
@@ -104,17 +124,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           mkdir -p old-release
           gh release download v1.0.0 --repo "$GITHUB_REPOSITORY" --pattern earth-online-1.0.0.apk --dir old-release
-          echo 'e48fb969889aec5df9e80af93564b1bcf0a335f1b3a3c3fbd1146295651563a4  old-release/earth-online-1.0.0.apk' | sha256sum -c -
-      - uses: actions/setup-java@v4
+          echo 'e48fb969889aec5df9e80af93564b1bcf0a335f1b3a3c3fbd1146295651563a4  old-release/earth-online-1.0.0.apk' | sha256sum --check
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.13'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
@@ -124,7 +145,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - uses: reactivecircus/android-emulator-runner@v2
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ matrix.api }}
           arch: x86_64
@@ -133,7 +154,7 @@ jobs:
           script: |
             bash scripts/emulator-acceptance.sh
             python3 scripts/release-v15-smoke.py release-output/earth-online-1.5.0.apk old-release/earth-online-1.0.0.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: v15-release-api-${{ matrix.api }}
@@ -145,36 +166,51 @@ jobs:
             verification/release-device/
           retention-days: 30
           if-no-files-found: error
-  publish:
-    needs: [package,device]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+
+  verify-candidate:
+    needs: device
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: v15-signed-packages
           path: release-output
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: v15-release-api-*
           path: device-evidence
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: v15-release-build-evidence
           path: build-evidence
-      - name: Verify exact counts, no skipped tests, screenshots and the same signed APK
-        run: python3 scripts/verify-v15-release.py release-output device-evidence build-evidence
-      - name: Publish the tested signed binary and reproducible evidence
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Verify exact binary, tests, native capture state and upgrade evidence
+        run: python3 scripts/verify-v15-final.py release-output device-evidence build-evidence
+      - name: Assemble immutable release candidate
         run: |
           set -euo pipefail
-          tar -czf release-output/verification-evidence.tar.gz device-evidence build-evidence
-          gh release create v1.5.0 --target "$GITHUB_SHA" --title '地球 Online 1.5.0 · 天命契约与可恢复成长' --notes-file docs/RELEASE_1.5.0.md \
-            release-output/earth-online-1.5.0.apk release-output/earth-online-1.5.0.aab \
-            release-output/mapping.txt release-output/SHA256SUMS.txt release-output/acceptance-summary.json \
-            release-output/source-commit.txt release-output/app-signing-certificate.crt \
-            release-output/certificate-sha256.txt release-output/apk-signature-verification.txt \
-            release-output/apk-manifest-summary.txt release-output/verification-evidence.tar.gz
+          mkdir -p release-ready
+          cp release-output/earth-online-1.5.0.apk release-ready/
+          cp release-output/earth-online-1.5.0.aab release-ready/
+          cp release-output/mapping.txt release-ready/
+          cp release-output/source-commit.txt release-ready/
+          cp release-output/app-signing-certificate.crt release-ready/
+          cp release-output/certificate-sha256.txt release-ready/
+          cp release-output/apk-signature-verification.txt release-ready/
+          cp release-output/bundle-signature-verification.txt release-ready/
+          cp release-output/bundle-signing-certificate.txt release-ready/
+          cp release-output/apk-manifest-summary.txt release-ready/
+          cp release-output/acceptance-summary.json release-ready/
+          cp docs/RELEASE_1.5.0.md release-ready/RELEASE_NOTES.md
+          tar -czf release-ready/device-acceptance-evidence.tar.gz device-evidence build-evidence
+          (cd release-ready && sha256sum * > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: v15-release-ready
+          path: release-ready/
+          retention-days: 90
+          if-no-files-found: error

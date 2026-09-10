@@ -69,7 +69,7 @@ class ContractJourneyTest {
         compose.onNodeWithTag("cancel-contract").performClick()
         assertTrue(runBlocking { repo.snapshotBackup().contracts.isEmpty() })
         compose.onNodeWithTag("calibrate-contract").performScrollTo().performClick()
-        compose.onNodeWithTag("confirm-contract").performClick()
+        compose.onNodeWithTag("confirm-contract", useUnmergedTree = true).performClick()
         awaitDb { it.contracts.size==1 }
         activity.recreate()
         awaitDb { it.contracts.size==1 }
@@ -84,7 +84,7 @@ class ContractJourneyTest {
         compose.onNodeWithTag("cancel-contract").performClick()
         assertEquals(day(t),runBlocking { repo.snapshotBackup().contracts.single().dueDay })
         compose.onNodeWithTag("postpone-contract").performScrollTo().performClick()
-        compose.onNodeWithTag("confirm-contract").performClick()
+        compose.onNodeWithTag("confirm-contract", useUnmergedTree = true).performClick()
         awaitDb { it.contracts.single().extensionCount==1 }
         val after=runBlocking { repo.snapshotBackup() }
         assertEquals(20L,after.contracts.single().currentRewardXp)
@@ -108,6 +108,21 @@ class ContractJourneyTest {
         assertEquals(4,after.consequences.size)
         assertEquals(100L,after.deadlineState().book.progress(after.world).debtXp)
     }
+    @Test fun overdueCultivationTrackOffersRecoveryInsteadOfOrdinaryPostpone() {
+        val t=now-2*86_400_000
+        val s=DeadlineEngine.reconcile(signed(base(t),"逾期修行",t),now)
+        start(snapshot(s))
+        waitFor(hasTestTag("acknowledge-overdue"))
+        compose.onNodeWithTag("acknowledge-overdue").performClick()
+        awaitDb { it.settlementReceipts.size==1 }
+        runBlocking { repo.setNarrativeSystem(NarrativeSystemId.CULTIVATION) }
+        compose.onNodeWithText("历练").performClick()
+        compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-next-recovery"))
+        compose.onNodeWithTag("quest-next-recovery").assertIsDisplayed()
+        compose.onNodeWithText("改命一日", substring = true).assertDoesNotExist()
+        compose.onNodeWithTag("quest-next-recovery").performClick()
+        waitFor(hasTestTag("contract-ledger"))
+    }
     @Test fun forceMajeureUsesCategoryAndExplicitPriceWithoutCreatingCompletion() {
         val t=now-2*86_400_000
         val s=DeadlineEngine.reconcile(signed(base(t),"现实变故",t),now)
@@ -120,7 +135,7 @@ class ContractJourneyTest {
         compose.onNodeWithTag("confirm-force-majeure").performClick()
         waitFor(hasTestTag("contract-confirmation"))
         compose.onNodeWithText("不发放任务完成奖励",substring=true).assertExists()
-        compose.onNodeWithTag("confirm-contract").performClick()
+        compose.onNodeWithTag("confirm-contract", useUnmergedTree = true).performClick()
         awaitDb { it.consequenceAdjustments.isNotEmpty() }
         val after=runBlocking { repo.snapshotBackup() }
         assertEquals(0L,after.deadlineState().book.progress(after.world).debtXp)

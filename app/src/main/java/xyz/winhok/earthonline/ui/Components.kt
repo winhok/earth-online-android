@@ -96,22 +96,15 @@ fun EmptyState(title: String, body: String, actionText: String? = null, action: 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun QuestCard(quest: Quest, day: Long, done: Boolean, busy: Boolean,
-              onOpen: () -> Unit, onComplete: () -> Unit) {
+              onOpen: () -> Unit, onComplete: () -> Unit, onOverdue: (() -> Unit)? = null) {
     val presenter = LocalNarrativePresenter.current
     val state = LocalEarthState.current
     val postpone = LocalQuestPostpone.current
     val cultivation = LocalNarrativeSystemId.current == NarrativeSystemId.CULTIVATION
-    val view = LocalView.current
-    val density = LocalDensity.current
-    val threshold = with(density) { 88.dp.toPx() }
-    val reduced = state.effects.reducedMotion || !ValueAnimator.areAnimatorsEnabled()
     val actionable = !done && !busy && QuestRules.available(quest, day)
+    val overdue = !done && state.book.latest(quest.id)?.status == "OVERDUE"
     val currentComplete by rememberUpdatedState(onComplete)
     val currentOpen by rememberUpdatedState(onOpen)
-    val currentActionable by rememberUpdatedState(actionable)
-    val haptics by rememberUpdatedState(state.effects.haptics)
-    var drag by remember { mutableFloatStateOf(0f) }
-    var signalled by remember { mutableStateOf(false) }
     var actionsOpen by rememberSaveable(quest.id) { mutableStateOf(false) }
     val completeLabel = presenter.text(ActionSemantic.COMPLETE_QUEST, semanticArguments {
         put(SemanticParameters.COMPLETE_QUEST_LABEL,
@@ -123,31 +116,13 @@ fun QuestCard(quest: Quest, day: Long, done: Boolean, busy: Boolean,
             border = BorderStroke(1.dp, if (cultivation) MaterialTheme.colorScheme.secondary.copy(alpha = .65f) else MaterialTheme.colorScheme.outlineVariant),
             colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             modifier = Modifier.fillMaxWidth().testTag("quest-card-${quest.id}")
-                .offset { IntOffset(if (reduced) 0 else (drag * .18f).roundToInt(), 0) }
                 .semantics {
                     customActions = buildList {
                         if (actionable) add(CustomAccessibilityAction(completeLabel) { currentComplete(); true })
                         add(CustomAccessibilityAction(presenter.text(ActionSemantic.EDIT_QUEST)) { currentOpen(); true })
                     }
                 }
-                .pointerInput(quest.id, threshold) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { drag = 0f; signalled = false },
-                        onDragCancel = { drag = 0f; signalled = false },
-                        onDragEnd = {
-                            if (drag >= threshold && currentActionable) currentComplete()
-                            else if (drag <= -threshold) actionsOpen = true
-                            drag = 0f; signalled = false
-                        },
-                    ) { change, amount ->
-                        change.consume()
-                        drag = (drag + amount).coerceIn(-threshold * 1.5f, threshold * 1.5f)
-                        if (abs(drag) >= threshold && !signalled) {
-                            signalled = true
-                            if (haptics) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        }
-                    }
-                }) {
+                .questSwipeGesture(quest.id, actionable, currentComplete) { actionsOpen = true }) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -177,13 +152,59 @@ fun QuestCard(quest: Quest, day: Long, done: Boolean, busy: Boolean,
             }
         }
         if (actionsOpen) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (actionable) TextButton(onClick = { actionsOpen = false; postpone(quest.id) }) {
+            if (overdue && onOverdue != null) TextButton(
+                onClick = { actionsOpen = false; onOverdue() },
+                modifier = Modifier.testTag("quest-overdue-recovery"),
+            ) {
+                Text(presenter.text(ActionSemantic.OPEN_RECOVERY))
+            } else if (actionable) TextButton(onClick = { actionsOpen = false; postpone(quest.id) }) {
                 Text(presenter.text(if (state.book.active(quest.id) != null) ContractSemantic.POSTPONE_SIGNED else ActionSemantic.POSTPONE_QUEST))
             }
             TextButton(onClick = { actionsOpen = false; onOpen() }) { Text(presenter.text(ActionSemantic.EDIT_QUEST)) }
             TextButton(onClick = { actionsOpen = false }) { Text(presenter.text(ActionSemantic.CLOSE)) }
         }
     }
+}
+
+/** One completion gesture contract for ordinary cards and the highlighted next quest. */
+@Composable
+internal fun Modifier.questSwipeGesture(
+    key: Any,
+    completeEnabled: Boolean,
+    onComplete: () -> Unit,
+    onRevealActions: (() -> Unit)? = null,
+): Modifier {
+    val state = LocalEarthState.current
+    val view = LocalView.current
+    val threshold = with(LocalDensity.current) { 88.dp.toPx() }
+    val reduced = state.effects.reducedMotion || !ValueAnimator.areAnimatorsEnabled()
+    val currentComplete by rememberUpdatedState(onComplete)
+    val currentReveal by rememberUpdatedState(onRevealActions)
+    val enabled by rememberUpdatedState(completeEnabled)
+    val haptics by rememberUpdatedState(state.effects.haptics)
+    var drag by remember(key) { mutableFloatStateOf(0f) }
+    var signalled by remember(key) { mutableStateOf(false) }
+    return this
+        .offset { IntOffset(if (reduced) 0 else (drag * .18f).roundToInt(), 0) }
+        .pointerInput(key, threshold) {
+            detectHorizontalDragGestures(
+                onDragStart = { drag = 0f; signalled = false },
+                onDragCancel = { drag = 0f; signalled = false },
+                onDragEnd = {
+                    if (drag >= threshold && enabled) currentComplete()
+                    else if (drag <= -threshold) currentReveal?.invoke()
+                    drag = 0f
+                    signalled = false
+                },
+            ) { change, amount ->
+                change.consume()
+                drag = (drag + amount).coerceIn(-threshold * 1.5f, threshold * 1.5f)
+                if (abs(drag) >= threshold && !signalled) {
+                    signalled = true
+                    if (haptics) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                }
+            }
+        }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

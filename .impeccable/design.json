@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-08T14:34:34Z",
+  "generatedAt": "2026-09-10T13:38:56Z",
   "title": "Design System: 地球 Online",
   "extensions": {
     "colorMeta": {
@@ -165,6 +165,78 @@
         "displayName": "暗轨描边",
         "canonical": "#3C4D41",
         "tonalRamp": ["#101713", "#17251C", "#263B2F", "#3C4D41", "#64766A", "#91A096", "#C5CEC7", "#F7FAF4"]
+      },
+      "cultivation-action": {
+        "role": "primary",
+        "displayName": "宗门翡翠",
+        "canonical": "#146B4D",
+        "tonalRamp": ["#041C14", "#073324", "#0D4D37", "#146B4D", "#3C8B6D", "#72B197", "#B8EBD2", "#EFFBF5"]
+      },
+      "cultivation-jade": {
+        "role": "primary",
+        "displayName": "矿物浅玉",
+        "canonical": "#B8EBD2",
+        "tonalRamp": ["#041C14", "#073324", "#0D4D37", "#146B4D", "#3C8B6D", "#72B197", "#B8EBD2", "#EFFBF5"]
+      },
+      "cultivation-gold": {
+        "role": "secondary",
+        "displayName": "契印金箔",
+        "canonical": "#755A1D",
+        "tonalRamp": ["#201600", "#392802", "#533D0A", "#755A1D", "#9E7B35", "#C6A35F", "#F2D99B", "#FFF5D9"]
+      },
+      "cultivation-gold-soft": {
+        "role": "secondary",
+        "displayName": "浅金契印",
+        "canonical": "#F2D99B",
+        "tonalRamp": ["#201600", "#392802", "#533D0A", "#755A1D", "#9E7B35", "#C6A35F", "#F2D99B", "#FFF5D9"]
+      },
+      "cultivation-breach": {
+        "role": "tertiary",
+        "displayName": "朱砂劫痕",
+        "canonical": "#9B3B34",
+        "tonalRamp": ["#2D0705", "#51120E", "#74231E", "#9B3B34", "#BD5E55", "#DD8A82", "#FFDAD5", "#FFF4F2"]
+      },
+      "cultivation-ground": {
+        "role": "neutral",
+        "displayName": "日间玉地",
+        "canonical": "#EAF4EC",
+        "tonalRamp": ["#071A16", "#10241D", "#3C5148", "#687D73", "#91A69B", "#B8CCC1", "#D9E7DE", "#EAF4EC"]
+      },
+      "cultivation-night-action": {
+        "role": "primary",
+        "displayName": "夜间宗门翡翠",
+        "canonical": "#63E6AF",
+        "tonalRamp": ["#002E20", "#074936", "#146B4D", "#288967", "#42AA82", "#63E6AF", "#B7F5D8", "#EEFFF7"]
+      },
+      "cultivation-night-jade": {
+        "role": "neutral",
+        "displayName": "黑漆玉简",
+        "canonical": "#123E31",
+        "tonalRamp": ["#04120F", "#071A16", "#0A1F1A", "#0D241F", "#123E31", "#304B41", "#829B90", "#EAF4EC"]
+      },
+      "cultivation-night-gold": {
+        "role": "secondary",
+        "displayName": "夜间契印金",
+        "canonical": "#E2BE70",
+        "tonalRamp": ["#211703", "#3D2D08", "#493A1D", "#755A1D", "#9F7F3E", "#C5A55D", "#E2BE70", "#F4D99A"]
+      },
+      "cultivation-night-gold-deep": {
+        "role": "secondary",
+        "displayName": "黑金容器",
+        "canonical": "#493A1D",
+        "tonalRamp": ["#211703", "#3D2D08", "#493A1D", "#755A1D", "#9F7F3E", "#C5A55D", "#E2BE70", "#F4D99A"]
+      },
+      "cultivation-night-breach": {
+        "role": "tertiary",
+        "displayName": "夜间朱砂劫痕",
+        "canonical": "#E96A61",
+        "tonalRamp": ["#3D0303", "#52211E", "#7B302B", "#A74740", "#CB5A52", "#E96A61", "#FFDAD5", "#FFF4F2"]
+      },
+      "cultivation-night-ground": {
+        "role": "neutral",
+        "displayName": "宗门玄夜",
+        "canonical": "#071A16",
+        "tonalRamp": ["#04120F", "#071A16", "#0A1F1A", "#0D241F", "#17332B", "#304B41", "#829B90", "#EAF4EC"]
       }
     },
     "typographyMeta": {
@@ -228,6 +300,14 @@
       "css": ".ds-reward-card{padding:22px;border-radius:20px;background:#FAE5B5;color:#302207;font-family:Roboto,sans-serif}.ds-reward-card small{font-weight:700;letter-spacing:.06em}.ds-reward-card h2{margin:10px 0 6px;font-size:24px;line-height:32px}.ds-reward-card p{margin:0 0 14px;font-size:14px;line-height:20px}.ds-reward-card button{min-height:48px;padding:8px 24px;border:0;border-radius:12px;background:#176B47;color:#fff;font-weight:500}.ds-reward-card button:hover{filter:brightness(1.08)}.ds-reward-card button:active{transform:scale(.98)}.ds-reward-card button:focus-visible{outline:3px solid #81D9B3;outline-offset:3px}"
     },
     {
+      "name": "Cultivation Contract Slip",
+      "kind": "card",
+      "refersTo": "card-cultivation-contract",
+      "description": "修仙任务首屏唯一主契约，绑定真实日期、奖励、完成、延期与详情动作。",
+      "html": "<article class=\"ds-contract-slip\"><small>下一项宗门任务</small><h2>整理一个真实的下一步</h2><p>天命契约 · 2026-09-13 当日结束</p><strong>+25 修为</strong><button aria-label=\"完成历练：整理一个真实的下一步\">完成</button></article>",
+      "css": ".ds-contract-slip{position:relative;padding:20px;clip-path:polygon(0 0,calc(100% - 28px) 0,100% 28px,100% 100%,18px 100%,0 calc(100% - 18px));background:#123E31;color:#EAF4EC;font-family:Roboto,sans-serif}.ds-contract-slip small,.ds-contract-slip strong{display:block;color:#E2BE70}.ds-contract-slip h2{margin:12px 72px 8px 0;font-size:24px;line-height:32px}.ds-contract-slip p{margin:0 0 14px;color:#B9CCC3}.ds-contract-slip button{position:absolute;right:20px;top:58px;width:56px;height:56px;border:0;border-radius:12px;background:#493A1D;color:#F4D99A}.ds-contract-slip:focus-within{outline:3px solid #63E6AF;outline-offset:3px}"
+    },
+    {
       "name": "Active Navigation Destination",
       "kind": "nav",
       "refersTo": "navigation-active",
@@ -245,13 +325,14 @@
   ],
   "narrative": {
     "northStar": "唯一服 · 单向时间 · 现实结算",
-    "overview": "地球 Online 把现实生活视作一场无法重开的限时冒险。应用可以离线，但人生始终在线；界面不是一张安静等待遗忘的 To-do 清单，而是一台把承诺、行动、代价与成长如实结算的玩家终端。\n\n底层事实只有一份，地球原生、修仙、武侠等体系是可以随时切换的叙事解释器。它们可以改变名称、图标、配色、触觉与结算演出，却不能改变任务、奖励、代价或历史。这份“爽感”来自确定、强烈、可追溯的行动反馈；这份重量来自公开、有限、可修复的失约代价，而不是随机惩罚或羞辱。\n\n当前实现是地球原生体系的视觉基线：翡翠绿承载行动，稀缺金色标记奖励和关键突破，深空底色提示“唯一服务器”。Material 3 的原生结构确保任何叙事体系都不会牺牲手机效率和可访问性。",
+    "overview": "地球 Online 把现实生活视作一场无法重开的限时冒险。应用可以离线，但人生始终在线；界面不是一张安静等待遗忘的 To-do 清单，而是一台把承诺、行动、代价与成长如实结算的玩家终端。\n\n底层事实只有一份，地球原生、修仙、武侠等体系是可以随时切换的叙事解释器。它们可以改变名称、图标、配色、触觉与结算演出，却不能改变任务、奖励、代价或历史。这份“爽感”来自确定、强烈、可追溯的行动反馈；这份重量来自公开、有限、可修复的失约代价，而不是随机惩罚或羞辱。\n\n当前实现同时包含地球原生基线与修仙“宗门战令”世界。地球原生以翡翠行动色、稀缺奖励金和清晰圆角容器表达现实探索；修仙以黑漆玉简、矿物浅玉、金箔契印、朱砂劫痕和星轨切角表达同一份事实。Material 3 的原生结构确保任何叙事体系都不会牺牲手机效率和可访问性。",
     "keyCharacteristics": [
       "现实任务拥有副本目标般的清晰入口和完成出口。",
       "XP、等级、技能、连续行动与 Boss 状态构成稳定的成长回路。",
       "翡翠绿负责“现在就行动”，奖励金只在结算与突破时爆发。",
       "圆润的 Material 3 容器保留亲和力，标题、数字和结算信息负责力量感。",
-      "世界观服务于行动；叙事可以切换，底层事实和交互位置保持稳定。"
+      "世界观服务于行动；叙事可以切换，底层事实和交互位置保持稳定。",
+      "修仙任务页以境界/劫债战况、唯一 Next Quest 玉简和真实任务轨迹形成完整战令，而不是换词后的普通列表。"
     ],
     "rules": [
       {"name": "The Two-Energy Rule", "body": "翡翠只表达行动与有效成长，金色只表达奖励、Boss 和突破；同一屏不再增加第三种高饱和竞争色。", "section": "colors"},
@@ -260,6 +341,7 @@
       {"name": "The Numbers Hit First Rule", "body": "等级、XP、连击天数与 Boss 进度必须先于解释文字被看见；数字承担力量感，正文承担可信度。", "section": "typography"},
       {"name": "The Interpreter Rule", "body": "叙事体系改变名称和气质，不改变信息层级。修仙不用难读的书法体，武侠不用仿古卷轴牺牲正文；所有体系继续服从 Android 可读性。", "section": "typography"},
       {"name": "The One Next Move Rule", "body": "每个页面优先暴露一个最值得立即执行的动作；手机以单个 FAB 或单个主按钮承载，不堆叠多个同等级召唤。", "section": "layout"},
+      {"name": "The Contract Rail Rule", "body": "修仙任务页必须让唯一主契约先于轨迹出现；轨迹只能呈现真实任务、完成和逾期事实，不能生成装饰节点或第二份进度。", "section": "layout"},
       {"name": "The Grounded Power Rule", "body": "平时界面稳稳落在地面上，只有当前行动、关键结算和系统级浮层获得明显高度；到处悬浮会稀释突破时刻。", "section": "elevation"}
     ],
     "dos": [
@@ -268,7 +350,8 @@
       "Do 使用 Material 3 组件、语义色、状态层、48dp 触控目标和系统返回行为承载所有刺激感。",
       "Do 同时维护日间与夜间方案，并在大字体、窄屏、宽屏和键盘弹出时保持下一步动作可见。",
       "Do 让体系切换即时重绘同一份历史，稳定保留任务、XP、代价、完成身份和审计事实。",
-      "Do 在失约前公开代价，在失约后同时展示损失与恢复路径，让惩罚有重量但不成为死局。"
+      "Do 在失约前公开代价，在失约后同时展示损失与恢复路径，让惩罚有重量但不成为死局。",
+      "Do 让任务首屏的体系、境界、债务、日期契约、奖励和完成动作都来自当前 Room 快照与叙事目录。"
     ],
     "donts": [
       "Don't 把界面做成换了名词的普通 To-do List；没有进度、结算和成长反馈的任务卡不符合这个世界。",

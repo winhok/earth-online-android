@@ -33,7 +33,17 @@ class VisualAcceptanceTest {
         oldFont=shell("settings get system font_scale").trim()
         runBlocking {
             repo.reset();repo.join("验收员","合成验收存档")
-            repo.saveQuest(QuestDraft(title="整理一个真实的下一步",description="这是验收测试数据，不是产品默认任务。"))
+            val today = repo.snapshot().dayAt(System.currentTimeMillis())
+            val signing = DeadlineCommand.Save(
+                QuestDraft(
+                    title = "整理一个真实的下一步",
+                    description = "这是验收测试数据，不是产品默认任务。",
+                    dueDay = today + 3,
+                ),
+                "visual-next",
+            )
+            val plan = repo.plan(signing)
+            repo.execute(signing, requireNotNull(plan.disclosure))
             val done=repo.saveQuest(QuestDraft(title="已完成的真实行动",difficulty=Difficulty.EASY));repo.complete(done.id)
             repo.setNarrativeSystem(NarrativeSystemId.CULTIVATION)
         }
@@ -57,6 +67,22 @@ class VisualAcceptanceTest {
         compose.onNodeWithTag("create-quest").assertIsDisplayed().assertHasClickAction()
         compose.onNodeWithTag("ledger-navigation").assertIsDisplayed().assertHasClickAction()
     }
+    private fun openCultivationQuestSurface() {
+        compose.onNodeWithText("历练").performClick()
+        compose.waitUntil(25_000) {
+            compose.onAllNodesWithTag("quest-battle-pass").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-realm-status"))
+        compose.onNodeWithTag("quest-realm-status").assertIsDisplayed()
+        compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-next-contract"))
+        compose.onNodeWithTag("quest-next-contract").assertIsDisplayed()
+        compose.onNodeWithTag("contract-info").assertExists()
+        compose.onNodeWithTag("quest-next-complete").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-cultivation-track"))
+        compose.onNodeWithTag("quest-cultivation-track").assertIsDisplayed()
+        compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-battle-pass"))
+        compose.onNodeWithTag("quest-battle-pass").assertIsDisplayed()
+    }
     private fun capture(name: String) {
         compose.waitForIdle()
         val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
@@ -65,43 +91,77 @@ class VisualAcceptanceTest {
             name.endsWith("200pct-action") -> "确认达成"
             else -> "地球 Online"
         }
-        fun nativeContentVisible(): Boolean = automation.rootInActiveWindow
-            ?.findAccessibilityNodeInfosByText(expected)?.any { it.isVisibleToUser } == true
+        fun expectedContentVisible(): Boolean = runCatching {
+            compose.onNodeWithText(expected, substring = true, useUnmergedTree = true).assertIsDisplayed()
+            true
+        }.getOrDefault(false)
+        fun appWindowVisible(): Boolean =
+            automation.rootInActiveWindow?.packageName?.toString() == app.packageName
         // Display/font changes can schedule a second Activity recreation after Compose
-        // first becomes idle. Wait for native content and accessibility events to settle.
+        // first becomes idle. Require both the expected Compose content and the target
+        // package's native accessibility window before and after events settle.
         val deadline = SystemClock.uptimeMillis() + 15_000
-        while (!nativeContentVisible() && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(80)
-        assertTrue("Native content missing before capture: $name", nativeContentVisible())
+        while ((!expectedContentVisible() || !appWindowVisible()) && SystemClock.uptimeMillis() < deadline) {
+            SystemClock.sleep(80)
+        }
+        assertTrue("Expected content missing before capture: $name", expectedContentVisible())
+        assertTrue("App window missing before capture: $name", appWindowVisible())
         automation.waitForIdle(700, 10_000)
-        assertTrue("Native content was replaced during configuration change: $name", nativeContentVisible())
+        assertTrue("Expected content was replaced during configuration change: $name", expectedContentVisible())
+        assertTrue("App window was replaced during configuration change: $name", appWindowVisible())
         val bitmap=requireNotNull(automation.takeScreenshot())
         val dir=File(app.getExternalFilesDir(null),"acceptance").apply { mkdirs() }
         File(dir,"$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) };bitmap.recycle()
         File(dir,"$name-capture-state.json").writeText(JSONObject()
-            .put("expected_text", expected).put("native_expected_text_visible", true)
+            .put("expected_text", expected).put("compose_expected_text_visible", true)
+            .put("native_app_window_visible", true)
             .put("package", app.packageName).put("settled_accessibility_idle_ms", 700).toString())
         File(dir,"$name-display.txt").writeText(shell("wm size")+shell("wm density")+"font="+shell("settings get system font_scale"))
     }
     @Test fun phoneCultivationDarkLightAndTwoHundredPercentFontRemainOperable() {
         show(ThemeMode.DARK,1080,1920,420,1f,false)
-        compose.onNodeWithTag("next-quest-action").assertIsDisplayed()
+        openCultivationQuestSurface()
+        compose.onNodeWithTag("quest-track-heading").assertIsDisplayed()
         capture("v15-phone-cultivation-dark")
         show(ThemeMode.LIGHT,1080,1920,420,1f,false)
-        compose.onNodeWithTag("next-quest-action").assertIsDisplayed()
+        openCultivationQuestSurface()
         capture("v15-phone-cultivation-light")
         show(ThemeMode.LIGHT,1080,1920,420,2f,false)
+        openCultivationQuestSurface()
         capture("v15-phone-cultivation-200pct-top")
-        compose.onNodeWithTag("dashboard-grid").performScrollToNode(hasTestTag("next-quest-action"))
-        compose.onNodeWithTag("next-quest-action").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-next-open"))
+        compose.onNodeWithTag("quest-next-open").assertIsDisplayed().performClick()
         compose.onNodeWithText("确认达成").performScrollTo().assertIsDisplayed()
         capture("v15-phone-cultivation-200pct-action")
     }
+    @Test fun battlePassSearchIsImmediateAndHighlightedQuestSupportsSwipeCompletion() {
+        show(ThemeMode.LIGHT,1080,1920,420,1f,false)
+        compose.onNodeWithText("历练").performClick()
+        compose.waitUntil(25_000) {
+            compose.onAllNodesWithTag("quest-next-contract").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("quest-next-contract").performTouchInput { swipeRight() }
+        compose.waitUntil(20_000) {
+            runBlocking { repo.snapshot().completions.any { it.questId == "visual-next" && it.revokedAt == null } }
+        }
+
+        runBlocking {
+            repo.saveQuest(QuestDraft(title = "重新出现的下一步", difficulty = Difficulty.NORMAL))
+        }
+        compose.onNodeWithTag("quest-search-toggle").performClick()
+        compose.onNodeWithTag("quest-search-field").assertIsDisplayed().performTextInput("重新出现")
+        compose.onNodeWithText("重新出现的下一步").assertExists()
+    }
     @Test fun tabletBothSchemesUseActualWideConfigurationAndKeepDraftOnRotation() {
         show(ThemeMode.DARK,1920,1200,240,1f,true)
+        openCultivationQuestSurface()
+        compose.onNodeWithTag("quest-battle-pass-wide").assertIsDisplayed()
         capture("v15-tablet-cultivation-dark")
         show(ThemeMode.LIGHT,1920,1200,240,1f,true)
+        openCultivationQuestSurface()
         capture("v15-tablet-cultivation-light")
-        compose.onNodeWithTag("create-quest").performClick()
+        compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-create"))
+        compose.onNodeWithTag("quest-create").assertIsDisplayed().performClick()
         compose.onNodeWithTag("quest-title").performTextInput("旋转保留草稿")
         shell("wm size 1200x1920")
         compose.waitUntil(25_000) { compose.onAllNodesWithTag("quest-title").fetchSemanticsNodes().isNotEmpty() }
