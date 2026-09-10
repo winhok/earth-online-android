@@ -18,6 +18,7 @@ results: list[str] = []
 PLATFORM_ANR_TITLES = (
     "Quickstep isn't responding", "Pixel Launcher isn't responding",
     "Launcher isn't responding", "System UI isn't responding",
+    "Process system isn't responding",
 )
 
 
