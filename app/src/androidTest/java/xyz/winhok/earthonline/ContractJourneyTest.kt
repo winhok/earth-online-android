@@ -84,6 +84,7 @@ class ContractJourneyTest {
         compose.onNodeWithTag("cancel-contract").performClick()
         assertEquals(day(t),runBlocking { repo.snapshotBackup().contracts.single().dueDay })
         compose.onNodeWithTag("postpone-contract").performScrollTo().performClick()
+        waitFor(hasTestTag("contract-confirmation"))
         compose.onNodeWithTag("confirm-contract", useUnmergedTree = true).performClick()
         awaitDb { it.contracts.single().extensionCount==1 }
         val after=runBlocking { repo.snapshotBackup() }

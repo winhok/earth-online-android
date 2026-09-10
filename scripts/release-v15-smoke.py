@@ -86,6 +86,7 @@ def export_file(stage):
     def exported():
         return set(ui.adb('shell','find','/sdcard/Download','-maxdepth','1','-type','f',
             '-name','earth-online-*.json').strip().splitlines())
+    ui.adb('shell','rm','-f','/sdcard/Download/earth-online-*.json')
     before=exported()
     settings();ui.click('导出存档',scroll=True)
     save=ui.nodes(lambda n:n.get('text','').upper()=='SAVE' or n.get('text')=='保存')[-1]

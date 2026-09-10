@@ -73,17 +73,19 @@ fun QuestsScreen(state: EarthUiState, create: () -> Unit, open: (String) -> Unit
             )
     }
     val listState = rememberLazyListState()
-    var narrativeAnchorQuestId by remember { mutableStateOf<String?>(null) }
-    DisposableEffect(state.narrativeSystemId) {
-        onDispose {
-            val questIds = world.quests.mapTo(hashSetOf()) { it.id }
-            narrativeAnchorQuestId = listState.layoutInfo.visibleItemsInfo.asReversed()
+    val questIds = remember(world.quests) { world.quests.mapTo(hashSetOf()) { it.id } }
+    var lastVisibleQuestId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(listState, questIds) {
+        snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo.asReversed()
                 .mapNotNull { it.key as? String }
                 .firstOrNull { it in questIds }
+        }.collect { questId ->
+            if (questId != null) lastVisibleQuestId = questId
         }
     }
     LaunchedEffect(state.narrativeSystemId) {
-        val questId = narrativeAnchorQuestId ?: return@LaunchedEffect
+        val questId = lastVisibleQuestId ?: return@LaunchedEffect
         val target = if (cultivationSurface) {
             val position = trackQuests.indexOfFirst { it.id == questId }
             if (position < 0) -1 else 2 + (if (toolsExpanded) 2 else 0) + position
@@ -92,7 +94,6 @@ fun QuestsScreen(state: EarthUiState, create: () -> Unit, open: (String) -> Unit
             if (position < 0) -1 else 4 + (if (world.goals.isNotEmpty()) 1 else 0) + position
         }
         if (target >= 0) listState.scrollToItem(target)
-        narrativeAnchorQuestId = null
     }
     LazyColumn(Modifier.fillMaxSize().testTag("quests-list"), state = listState,
         contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 104.dp),
