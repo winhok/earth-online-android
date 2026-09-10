@@ -22,7 +22,7 @@ import xyz.winhok.earthonline.data.deadlineState
 @RunWith(AndroidJUnit4::class)
 class VisualAcceptanceTest {
     @get:Rule val compose = createEmptyComposeRule()
-    private lateinit var activity: ActivityScenario<MainActivity>
+    private var activity: ActivityScenario<MainActivity>? = null
     private val app get() = ApplicationProvider.getApplicationContext<EarthApplication>()
     private val repo get() = app.repository
     private fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(
@@ -49,18 +49,27 @@ class VisualAcceptanceTest {
         }
     }
     @After fun restoreDevice() {
-        if (::activity.isInitialized) activity.close()
-        shell("wm size reset");shell("wm density reset")
-        shell("settings put system font_scale ${oldFont.toFloatOrNull() ?: 1f}")
+        try {
+            activity?.let { scenario ->
+                shell("am start -W -n ${app.packageName}/.MainActivity")
+                scenario.close()
+            }
+        } finally {
+            activity = null
+            shell("wm size reset");shell("wm density reset")
+            shell("settings put system font_scale ${oldFont.toFloatOrNull() ?: 1f}")
+        }
     }
     private fun show(mode: ThemeMode, width: Int, height: Int, density: Int, font: Float, expectedWide: Boolean) {
-        if (::activity.isInitialized) activity.close()
+        activity?.close()
+        activity = null
         shell("wm size ${width}x${height}");shell("wm density $density")
         shell("settings put system font_scale $font")
         runBlocking { repo.updatePlayer("验收员","合成验收存档",mode,false,20) }
-        activity=ActivityScenario.launch(MainActivity::class.java)
+        val launched = ActivityScenario.launch<MainActivity>(MainActivity::class.java)
+        activity = launched
         compose.waitUntil(25_000) { compose.onAllNodesWithTag("dashboard-grid").fetchSemanticsNodes().isNotEmpty() }
-        activity.onActivity { a ->
+        launched.onActivity { a ->
             assertEquals(font,a.resources.configuration.fontScale,0.02f)
             assertEquals(expectedWide,a.resources.configuration.screenWidthDp>=720)
         }
@@ -101,7 +110,12 @@ class VisualAcceptanceTest {
         // first becomes idle. Require both the expected Compose content and the target
         // package's native accessibility window before and after events settle.
         val deadline = SystemClock.uptimeMillis() + 15_000
+        var nextForegroundRetry = 0L
         while ((!expectedContentVisible() || !appWindowVisible()) && SystemClock.uptimeMillis() < deadline) {
+            if (!appWindowVisible() && SystemClock.uptimeMillis() >= nextForegroundRetry) {
+                shell("am start -W -n ${app.packageName}/.MainActivity")
+                nextForegroundRetry = SystemClock.uptimeMillis() + 2_000
+            }
             SystemClock.sleep(80)
         }
         assertTrue("Expected content missing before capture: $name", expectedContentVisible())

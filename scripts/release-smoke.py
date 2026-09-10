@@ -138,11 +138,7 @@ def hide_keyboard() -> None:
         print('RELEASE_WARN keyboard_visibility_signal_stale', flush=True)
 
 
-def click(value: str, scroll: bool = False) -> None:
-    print('RELEASE_UI_CLICK', value, flush=True)
-    if not scroll:
-        tap(max(nodes(is_label(value)), key=lambda n: bounds(n)[3]))
-        return
+def scroll_to(value: str) -> ET.Element:
     for _ in range(9):
         # First let the new window appear; an IME may arrive after the initial tap.
         dump()
@@ -150,7 +146,7 @@ def click(value: str, scroll: bool = False) -> None:
         root = dump()
         found = [n for n in root.iter('node') if is_label(value)(n)]
         if found:
-            tap(found[-1]); return
+            return found[-1]
         w, h = map(int, re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1])
         scrolling = [n for n in root.iter('node') if n.get('scrollable') == 'true' and n.get('package') == PACKAGE]
         assert scrolling, f'No scrollable app content while searching for {value}'
@@ -163,6 +159,12 @@ def click(value: str, scroll: bool = False) -> None:
         assert start_y > end_y + 50, (container.attrib, value)
         adb('shell', 'input', 'swipe', str(x), str(start_y), str(x), str(end_y), '350')
     raise AssertionError(f'Could not scroll to {value}')
+
+
+def click(value: str, scroll: bool = False) -> None:
+    print('RELEASE_UI_CLICK', value, flush=True)
+    node = scroll_to(value) if scroll else max(nodes(is_label(value)), key=lambda n: bounds(n)[3])
+    tap(node)
 
 
 def screenshot(name: str) -> None:
@@ -189,7 +191,7 @@ def create_task(title: str) -> None:
     hide_keyboard(); click('保存')
     wait_absent(is_label('任务标题'))
     nodes(is_label('任务日志'))
-    click('进行中'); nodes(is_label(title))
+    click('进行中'); scroll_to(title)
 
 
 def main() -> None:
@@ -238,7 +240,7 @@ def main() -> None:
     click('设置与存档'); click('导入存档', scroll=True)
     tap(nodes(lambda n: n.get('text') == filename)[0])
     nodes(is_label('覆盖本机存档？')); click('确认覆盖')
-    nodes(is_label('任务')); click('任务'); nodes(is_label('ReleaseSmokeTask'))
+    nodes(is_label('任务')); click('任务'); scroll_to('ReleaseSmokeTask')
     assert not any(is_label('MustDisappearAfterRestore')(n) for n in dump().iter('node'))
     ok('real_SAF_restore_replaces_only_after_confirmation'); screenshot('06-after-restore')
     crashes = adb('logcat', '-d', '-b', 'crash')

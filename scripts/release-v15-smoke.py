@@ -172,7 +172,7 @@ def main():
     ok('v1_data_preserved_unsigned')
     ui.adb('shell','svc','wifi','disable',check=False);ui.adb('shell','svc','data','disable',check=False)
     ui.click('任务');ui.create_task('UpgradeAction')
-    ui.click('完成任务：UpgradeAction');ui.click('已完成');ui.click('UpgradeAction')
+    ui.click('完成任务：UpgradeAction',scroll=True);ui.click('已完成');ui.click('UpgradeAction')
     ui.click('撤销本次完成',scroll=True);ui.nodes(ui.is_label('确认完成'));ui.click('关闭')
     action,_=export_file('ordinary-action')
     assert len([c for c in action['completions'] if c['title']=='UpgradeAction'])==1

@@ -66,7 +66,7 @@ def main():
     for api in (26,29,35,36):
         root=evidence/f'v15-release-api-{api}'
         tests=cases(root/'app/build/outputs/androidTest-results')
-        assert len(tests)==68,f'Expected 68 real instrumentation cases on API {api}, got {len(tests)}'
+        assert len(tests)==69,f'Expected 69 real instrumentation cases on API {api}, got {len(tests)}'
         for name in ('ContractJourneyTest','VisualAcceptanceTest','ReleaseFixtureTest'):
             assert any(name in (c or '') for c,n in tests),name
         signed=root/'verification/v15-release'
