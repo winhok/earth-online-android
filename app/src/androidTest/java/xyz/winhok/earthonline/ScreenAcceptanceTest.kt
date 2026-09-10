@@ -142,7 +142,12 @@ class ScreenAcceptanceTest {
         compose.waitUntil(15_000) {
             compose.onAllNodesWithText("历练").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText(lastTitle).assertIsDisplayed()
+        compose.waitUntil(15_000) {
+            runCatching {
+                compose.onNodeWithText(lastTitle).assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
         compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-search-toggle"))
         compose.onNodeWithTag("quest-search-toggle").performClick()
         compose.onNodeWithTag("quests-list").performScrollToNode(

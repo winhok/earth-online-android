@@ -48,15 +48,6 @@ def settings():
         ui.click('设置与存档');ui.nodes(ui.is_label('玩家设置'))
 
 
-def set_text(field,text):
-    ui.tap(field)
-    ui.adb('shell','input','keyevent','KEYCODE_MOVE_END')
-    old=field.get('text','')
-    if old: ui.adb('shell','input','keyevent',*(['KEYCODE_DEL']*min(len(old)+3,150)))
-    ui.adb('shell','input','text',text)
-    ui.nodes(lambda n:n.get('class')=='android.widget.EditText' and n.get('text')==text)
-
-
 def pick_file(name):
     for attempt in range(12):
         root=ui.dump()
@@ -92,15 +83,22 @@ def restore_file(file:Path,*,cancel=False,overdue=False):
 
 def export_file(stage):
     name='earth-online-'+stage+'.json'
-    remote='/sdcard/Download/'+name
-    # Repeated local verification must never pull an older file with the same evidence name.
-    ui.adb('shell','rm','-f',remote)
+    def exported():
+        return set(ui.adb('shell','find','/sdcard/Download','-maxdepth','1','-type','f',
+            '-name','earth-online-*.json').strip().splitlines())
+    before=exported()
     settings();ui.click('导出存档',scroll=True)
-    field=ui.nodes(lambda n:n.get('class')=='android.widget.EditText')[-1]
-    set_text(field,name);ui.hide_keyboard()
     save=ui.nodes(lambda n:n.get('text','').upper()=='SAVE' or n.get('text')=='保存')[-1]
     ui.tap(save)
     ui.nodes(lambda n:any(t.startswith('存档已导出') for t in ui.labels(n)))
+    deadline=time.monotonic()+10
+    created=set()
+    while time.monotonic()<deadline:
+        created=exported()-before
+        if len(created)==1:break
+        time.sleep(.2)
+    assert len(created)==1,created
+    remote=created.pop()
     file=OUT/name
     ui.adb('pull',remote,str(file))
     envelope=json.loads(file.read_text())
