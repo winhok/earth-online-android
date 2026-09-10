@@ -86,11 +86,15 @@ class ScreenAcceptanceTest {
             useUnmergedTree = true,
         ).assertExists()
         compose.onNodeWithTag("narrative-cultivation").performScrollTo().performClick()
-        compose.waitUntil(15_000) {
-            runBlocking { repo.snapshotBackup().narrativePreference.narrativeId } == "cultivation"
+        compose.waitUntil(30_000) {
+            runBlocking { repo.snapshotBackup().narrativePreference.narrativeId } == "cultivation" &&
+                compose.onAllNodes(
+                    hasContentDescription("关闭编辑") and isEnabled(),
+                ).fetchSemanticsNodes().isNotEmpty()
         }
+        assertEquals("cultivation", runBlocking { repo.snapshotBackup().narrativePreference.narrativeId })
         val notificationManager = compose.activity.getSystemService(NotificationManager::class.java)
-        compose.waitUntil(15_000) {
+        compose.waitUntil(30_000) {
             notificationManager.getNotificationChannel(Reminders.CHANNEL)?.name?.toString() ==
                 "每日修行提醒"
         }

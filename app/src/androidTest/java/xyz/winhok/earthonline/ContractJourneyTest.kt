@@ -116,6 +116,7 @@ class ContractJourneyTest {
         compose.onNodeWithTag("acknowledge-overdue").performClick()
         awaitDb { it.settlementReceipts.size==1 }
         runBlocking { repo.setNarrativeSystem(NarrativeSystemId.CULTIVATION) }
+        waitFor(hasText("历练") and hasClickAction())
         compose.onNodeWithText("历练").performClick()
         compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-next-recovery"))
         compose.onNodeWithTag("quest-next-recovery").assertIsDisplayed()

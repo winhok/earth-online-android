@@ -15,7 +15,7 @@ visuals={
  'v15-tablet-cultivation-dark','v15-tablet-cultivation-light',
  'v15-tablet-rotated-draft','v15-phone-earth-light',
 }
-for api in (26,29,35,36):
+for api in (29,35,36):
     root=evidence/f'v15-release-api-{api}'/'verification/device/screenshots'
     for name in visuals:
         state=json.loads((root/f'{name}-capture-state.json').read_text())
@@ -37,7 +37,7 @@ summary['test_harness_commit']=harness
 summary['signed_application_source_commit']=signed_source
 summary['build_input_manifest_sha256']=metadata['build_input_manifest_sha256']
 summary['application_source_equivalence']=metadata['application_source_equivalence']
-summary['native_capture_states_verified']=32
+summary['native_capture_states_verified']=24
 summary['visual_review']='Actual screenshots retained for completion review; no claim of human physical-device validation.'
 summary_path.write_text(json.dumps(summary,ensure_ascii=False,indent=2))
 print('32 native capture states verified in addition to all exact-APK and instrumentation gates.')

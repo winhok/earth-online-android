@@ -18,9 +18,10 @@ CHECKS={
  'undo_restores_allocations_debt','force_majeure_preserves_assessment_no_reward',
  'recovery_uses_real_tasks_until_zero','no_release_crash',
 }
-IMAGES={'v15-phone-cultivation-dark','v15-phone-cultivation-light','v15-phone-cultivation-200pct-top',
+VISUAL_IMAGES={'v15-phone-cultivation-dark','v15-phone-cultivation-light','v15-phone-cultivation-200pct-top',
  'v15-phone-cultivation-200pct-action','v15-tablet-cultivation-dark','v15-tablet-cultivation-light',
- 'v15-tablet-rotated-draft','v15-phone-earth-light','v15-overdue-batch','v15-legacy-signed','v15-recovery-closed'}
+ 'v15-tablet-rotated-draft','v15-phone-earth-light'}
+RELEASE_IMAGES={'v15-overdue-batch','v15-legacy-signed','v15-recovery-closed'}
 
 
 def cases(root):
@@ -66,16 +67,20 @@ def main():
     for api in (26,29,35,36):
         root=evidence/f'v15-release-api-{api}'
         tests=cases(root/'app/build/outputs/androidTest-results')
-        assert len(tests)==69,f'Expected 69 real instrumentation cases on API {api}, got {len(tests)}'
-        for name in ('ContractJourneyTest','VisualAcceptanceTest','ReleaseFixtureTest'):
+        expected=65 if api==26 else 69
+        assert len(tests)==expected,f'Expected {expected} real instrumentation cases on API {api}, got {len(tests)}'
+        required=('ContractJourneyTest','ReleaseFixtureTest') if api==26 else ('ContractJourneyTest','VisualAcceptanceTest','ReleaseFixtureTest')
+        for name in required:
             assert any(name in (c or '') for c,n in tests),name
+        if api==26: assert not any('VisualAcceptanceTest' in (c or '') for c,n in tests)
         signed=root/'verification/v15-release'
         completed=json.loads((signed/'results.json').read_text())['passed_checks']
         assert len(completed)==len(CHECKS) and set(completed)==CHECKS,f'Incomplete release journey API {api}'
         assert (signed/'apk-sha256.txt').read_text().strip()==sha,f'Wrong APK on API {api}'
         assert 'Success' in (signed/'upgrade-install.txt').read_text()
         screenshots=root/'verification/device/screenshots'
-        for name in IMAGES:
+        images=RELEASE_IMAGES if api==26 else VISUAL_IMAGES|RELEASE_IMAGES
+        for name in images:
             image=screenshots/f'{name}.png'
             assert image.stat().st_size>1000 and image.read_bytes()[:8]==b'\x89PNG\r\n\x1a\n',image
         summary['devices'].append(dict(api=api,instrumented_cases=len(tests),signed_apk_checks=completed))

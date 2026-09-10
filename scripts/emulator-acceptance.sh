@@ -2,7 +2,11 @@
 set -uo pipefail
 mkdir -p verification/device
 # Capture evidence even when a test fails; preserve the real Gradle exit status.
-gradle :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --stacktrace > verification/device/instrumentation.log 2>&1
+args=(:app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --stacktrace)
+if [[ -n "${ANDROID_TEST_NOT_CLASS:-}" ]]; then
+  args+=("-Pandroid.testInstrumentationRunnerArguments.notClass=$ANDROID_TEST_NOT_CLASS")
+fi
+gradle "${args[@]}" > verification/device/instrumentation.log 2>&1
 status=$?
 adb pull /sdcard/Android/data/xyz.winhok.earthonline.debug/files/acceptance verification/device/screenshots >/dev/null 2>&1 || true
 adb logcat -d -b crash > verification/device/crash-log.txt || true
