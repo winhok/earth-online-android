@@ -18,6 +18,7 @@ import android.view.SoundEffectConstants
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.collectLatest
 import xyz.winhok.earthonline.core.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,7 +45,7 @@ fun EarthApp(model: EarthViewModel, state: EarthUiState) {
     val create: () -> Unit = { editId = null; editorOpen = true }
     val openGoal: (String?) -> Unit = { goalId = it; goalOpen = true }
     LaunchedEffect(model) {
-        model.messages.collect { message ->
+        model.messages.collectLatest { message ->
             if (message.closeEditor) editorOpen = false
             feedback = message.feedback
             message.feedback?.let { feedback ->

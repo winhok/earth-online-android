@@ -37,7 +37,9 @@ jobs:
       - name: Require the unpublished local-signing candidate
         run: |
           set -euo pipefail
-          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v1.5.0" --jq .draft)" = true
+          DRAFT_ID="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" \
+            --jq '.[] | select(.tag_name == "v1.5.0" and .draft == true) | .id')"
+          test -n "$DRAFT_ID"
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
