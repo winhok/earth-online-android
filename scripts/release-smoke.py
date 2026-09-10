@@ -218,6 +218,9 @@ def main() -> None:
     for label, filename in [('角色', '03-character'), ('日志', '04-journal')]:
         click(label); screenshot(filename)
     click('设置与存档'); nodes(is_label('玩家设置')); screenshot('05-settings')
+    # This harness only runs on a disposable emulator. Remove its earlier exports so
+    # a repeated verification cannot collide with the system picker's default name.
+    adb('shell', 'sh', '-c', 'rm -f /sdcard/Download/earth-online-*.json')
     click('导出存档', scroll=True)
     save = nodes(lambda n: n.get('text', '').upper() == 'SAVE' or n.get('text') == '保存')[-1]
     tap(save)
