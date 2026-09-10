@@ -1,4 +1,4 @@
-name: Build and verify Android 1.5.0 candidate
+name: Verify locally signed Android 1.5.0 candidate
 
 on:
   workflow_dispatch:
@@ -17,7 +17,10 @@ env:
   VERSION_NAME: '1.5.0'
   VERSION_CODE: '2'
   SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-  HANDOFF_REF: ${{ github.event.pull_request.head.ref || 'release/1.5.0-completion' }}
+  SIGNED_APPLICATION_SOURCE_COMMIT: '3fd76ec9774e50f21991b909c77ad77a2fd65334'
+  SIGNED_BUILD_INPUT_MANIFEST_SHA256: 'e138cb8ed20a755122ea00bbe11540119a46adb292a06beecba080621c857d09'
+  SIGNED_APK_SHA256: '102f126db5c1590c7149fbfc1f3fd0ab1050968513589b819b3d0ff52c029c19'
+  SIGNED_AAB_SHA256: 'e78d73d2b8f6a574c612a0c514620798f3642fbb92e91a9762748249e21d4352'
 
 jobs:
   package:
@@ -31,13 +34,10 @@ jobs:
         with:
           ref: ${{ env.SOURCE_COMMIT }}
           persist-credentials: false
-      - name: Refuse to replace an existing release
+      - name: Require the unpublished local-signing candidate
         run: |
           set -euo pipefail
-          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v1.5.0" >/dev/null 2>&1; then
-            echo 'Release v1.5.0 already exists; refusing to rebuild a second candidate.' >&2
-            exit 1
-          fi
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v1.5.0" --jq .draft)" = true
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
@@ -52,27 +52,29 @@ jobs:
       - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
       - name: Verify source, lint, unsigned release and test APK compilation
         run: ./gradlew :core:test :app:lintDebug :app:lintRelease :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest --stacktrace
-      - name: Create this run's one-day encrypted-transfer recipient
-        run: python3 scripts/receive-signing.py prepare
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: v15-signing-recipient
-          path: ${{ runner.temp }}/v15-public-recipient/
-          retention-days: 1
-          if-no-files-found: error
-      - name: Receive and verify the original v1.0 signing identity
-        run: python3 scripts/receive-signing.py receive
-      - name: Build and verify signed release artifacts
+      - name: Download and verify the locally signed candidate
         run: |
           set -euo pipefail
-          ./gradlew :app:assembleRelease :app:bundleRelease --stacktrace
           mkdir -p release-output
-          cp app/build/outputs/apk/release/app-release.apk release-output/earth-online-1.5.0.apk
-          cp app/build/outputs/bundle/release/app-release.aab release-output/earth-online-1.5.0.aab
-          cp app/build/outputs/mapping/release/mapping.txt release-output/mapping.txt
-          keytool -exportcert -rfc -keystore "$ANDROID_KEYSTORE_PATH" -storepass:env ANDROID_KEYSTORE_PASSWORD -alias "$ANDROID_KEY_ALIAS" -file release-output/app-signing-certificate.crt
-          openssl x509 -in release-output/app-signing-certificate.crt -outform DER | sha256sum > release-output/certificate-sha256.txt
-          grep -q '^447baf2063785d0e45d1f267c8b8a3fb1904f7b33d88bef6cf0f922aa0b017bd ' release-output/certificate-sha256.txt
+          gh release download v1.5.0 --repo "$GITHUB_REPOSITORY" --dir release-output \
+            --pattern earth-online-1.5.0.apk --pattern earth-online-1.5.0.aab \
+            --pattern mapping.txt --pattern app-signing-certificate.crt \
+            --pattern candidate-metadata.json --pattern certificate-sha256.txt \
+            --pattern signed-application-source-commit.txt --pattern test-harness-commit.txt
+          test "$(jq -r .signed_application_source_commit release-output/candidate-metadata.json)" = "$SIGNED_APPLICATION_SOURCE_COMMIT"
+          test "$(jq -r .test_harness_commit release-output/candidate-metadata.json)" = "$SOURCE_COMMIT"
+          test "$(jq -r .build_input_manifest_sha256 release-output/candidate-metadata.json)" = "$SIGNED_BUILD_INPUT_MANIFEST_SHA256"
+          BUILD_INPUT_MANIFEST_SHA256="$(git ls-tree -r HEAD -- app core gradle build.gradle.kts settings.gradle.kts gradle.properties gradlew gradlew.bat | sha256sum | cut -d ' ' -f 1)"
+          test "$BUILD_INPUT_MANIFEST_SHA256" = "$SIGNED_BUILD_INPUT_MANIFEST_SHA256"
+          test "$(jq -r .apk_sha256 release-output/candidate-metadata.json)" = "$SIGNED_APK_SHA256"
+          test "$(jq -r .aab_sha256 release-output/candidate-metadata.json)" = "$SIGNED_AAB_SHA256"
+          echo "$SIGNED_APK_SHA256  release-output/earth-online-1.5.0.apk" | sha256sum --check
+          echo "$SIGNED_AAB_SHA256  release-output/earth-online-1.5.0.aab" | sha256sum --check
+          test "$(cat release-output/signed-application-source-commit.txt)" = "$SIGNED_APPLICATION_SOURCE_COMMIT"
+          test "$(cat release-output/test-harness-commit.txt)" = "$SOURCE_COMMIT"
+          CERT_SHA256="$(openssl x509 -in release-output/app-signing-certificate.crt -outform DER | sha256sum | cut -d ' ' -f 1)"
+          test "$CERT_SHA256" = '447baf2063785d0e45d1f267c8b8a3fb1904f7b33d88bef6cf0f922aa0b017bd'
+          test "$(cat release-output/certificate-sha256.txt)" = "$CERT_SHA256"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs release-output/earth-online-1.5.0.apk > release-output/apk-signature-verification.txt
           grep -q '447baf2063785d0e45d1f267c8b8a3fb1904f7b33d88bef6cf0f922aa0b017bd' release-output/apk-signature-verification.txt
           jarsigner -verify release-output/earth-online-1.5.0.aab > release-output/bundle-signature-verification.txt
@@ -80,9 +82,10 @@ jobs:
           AAB_CERT_SHA256="$(sed -n 's/^[[:space:]]*SHA256: //p' release-output/bundle-signing-certificate.txt | head -n 1 | tr -d ':' | tr 'A-F' 'a-f')"
           test "$AAB_CERT_SHA256" = '447baf2063785d0e45d1f267c8b8a3fb1904f7b33d88bef6cf0f922aa0b017bd'
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging release-output/earth-online-1.5.0.apk > release-output/apk-manifest-summary.txt
+          grep -q "package: name='xyz.winhok.earthonline' versionCode='2' versionName='1.5.0'" release-output/apk-manifest-summary.txt
           ! grep -q "uses-permission: name='android.permission.INTERNET'" release-output/apk-manifest-summary.txt
           ! grep -q 'application-debuggable' release-output/apk-manifest-summary.txt
-          printf '%s\n' "$SOURCE_COMMIT" > release-output/source-commit.txt
+          cp release-output/signed-application-source-commit.txt release-output/source-commit.txt
           (cd release-output && sha256sum earth-online-1.5.0.apk earth-online-1.5.0.aab mapping.txt > SHA256SUMS.txt)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -99,10 +102,6 @@ jobs:
             app/build/reports/
             app/schemas/
           retention-days: 30
-      - name: Remove all temporary private signing material
-        if: always()
-        run: rm -rf "$RUNNER_TEMP/v15-private-signing" "$RUNNER_TEMP/v15-public-recipient"
-
   device:
     needs: package
     runs-on: ubuntu-24.04
@@ -204,6 +203,9 @@ jobs:
           cp release-output/bundle-signature-verification.txt release-ready/
           cp release-output/bundle-signing-certificate.txt release-ready/
           cp release-output/apk-manifest-summary.txt release-ready/
+          cp release-output/candidate-metadata.json release-ready/
+          cp release-output/signed-application-source-commit.txt release-ready/
+          cp release-output/test-harness-commit.txt release-ready/
           cp release-output/acceptance-summary.json release-ready/
           cp docs/RELEASE_1.5.0.md release-ready/RELEASE_NOTES.md
           tar -czf release-ready/device-acceptance-evidence.tar.gz device-evidence build-evidence

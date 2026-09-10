@@ -28,10 +28,15 @@ summary_path=packages/'acceptance-summary.json'
 summary=json.loads(summary_path.read_text())
 harness=os.environ['SOURCE_COMMIT']
 assert re.fullmatch('[0-9a-f]{40}',harness)
-assert (packages/'source-commit.txt').read_text().strip()==harness
+metadata=json.loads((packages/'candidate-metadata.json').read_text())
+signed_source=(packages/'source-commit.txt').read_text().strip()
+assert re.fullmatch('[0-9a-f]{40}',signed_source)
+assert metadata['signed_application_source_commit']==signed_source
+assert metadata['test_harness_commit']==harness
 summary['test_harness_commit']=harness
-summary['signed_application_source_commit']=(packages/'source-commit.txt').read_text().strip()
-summary['application_source_equivalence']='The signed app, test APK, core tests and device jobs all checked out the same recorded source commit.'
+summary['signed_application_source_commit']=signed_source
+summary['build_input_manifest_sha256']=metadata['build_input_manifest_sha256']
+summary['application_source_equivalence']=metadata['application_source_equivalence']
 summary['native_capture_states_verified']=32
 summary['visual_review']='Actual screenshots retained for completion review; no claim of human physical-device validation.'
 summary_path.write_text(json.dumps(summary,ensure_ascii=False,indent=2))
