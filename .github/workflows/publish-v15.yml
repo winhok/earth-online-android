@@ -19,7 +19,7 @@ env:
   CANDIDATE_TAG: 'v1.5.0-rc.1'
   SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
   SIGNED_APPLICATION_SOURCE_COMMIT: '0108b69b94415a8a38dad7a0cd62af1d08eba5ca'
-  SIGNED_BUILD_INPUT_MANIFEST_SHA256: '488e5aad2baaa8c9de33f613689c39da8ae2ec190f03440854eca945f9ece080'
+  SIGNED_BUILD_INPUT_MANIFEST_SHA256: '8b9ae145f5660fee155ca048521667f0ef21163e76458def00a1da3245ff9bdd'
   SIGNED_APK_SHA256: '7152115d54daefca8ffea1da7133e6b45bdfe119fcd286a22ae678903625c099'
   SIGNED_AAB_SHA256: '8cf0b0733cc17389c6da260b13a13d8b214ba5efb14b0ac06bb1a358fab45a73'
 
@@ -66,7 +66,10 @@ jobs:
           test "$(jq -r .signed_application_source_commit release-output/candidate-metadata.json)" = "$SIGNED_APPLICATION_SOURCE_COMMIT"
           test "$(jq -r .test_harness_commit release-output/candidate-metadata.json)" = "$SOURCE_COMMIT"
           test "$(jq -r .build_input_manifest_sha256 release-output/candidate-metadata.json)" = "$SIGNED_BUILD_INPUT_MANIFEST_SHA256"
-          BUILD_INPUT_MANIFEST_SHA256="$(git ls-tree -r HEAD -- app core gradle build.gradle.kts settings.gradle.kts gradle.properties gradlew gradlew.bat | sha256sum | cut -d ' ' -f 1)"
+          BUILD_INPUT_MANIFEST_SHA256="$(git ls-tree -r HEAD -- \
+            app/src/main app/build.gradle.kts app/proguard-rules.pro app/schemas \
+            core/src/main core/build.gradle.kts gradle build.gradle.kts settings.gradle.kts \
+            gradle.properties gradlew gradlew.bat | sha256sum | cut -d ' ' -f 1)"
           test "$BUILD_INPUT_MANIFEST_SHA256" = "$SIGNED_BUILD_INPUT_MANIFEST_SHA256"
           test "$(jq -r .apk_sha256 release-output/candidate-metadata.json)" = "$SIGNED_APK_SHA256"
           test "$(jq -r .aab_sha256 release-output/candidate-metadata.json)" = "$SIGNED_AAB_SHA256"
