@@ -140,7 +140,7 @@ def legacy_fixture():
 
 
 def open_task(title):
-    ui.click('任务');ui.click('进行中');ui.click(title,scroll=True)
+    ui.click('任务');ui.click('进行中',scroll=True);ui.click(title,scroll=True)
 
 
 def main():
@@ -171,7 +171,7 @@ def main():
     ok('v1_data_preserved_unsigned')
     ui.adb('shell','svc','wifi','disable',check=False);ui.adb('shell','svc','data','disable',check=False)
     ui.click('任务');ui.create_task('UpgradeAction')
-    ui.click('完成任务：UpgradeAction',scroll=True);ui.click('已完成');ui.click('UpgradeAction')
+    ui.click('完成任务：UpgradeAction',scroll=True);ui.click('已完成',scroll=True);ui.click('UpgradeAction',scroll=True)
     ui.click('撤销本次完成',scroll=True);ui.nodes(ui.is_label('确认完成'));ui.click('关闭')
     action,_=export_file('ordinary-action')
     assert len([c for c in action['completions'] if c['title']=='UpgradeAction'])==1
@@ -226,14 +226,14 @@ def main():
     repeated,_=export_file('restart');assert facts(repeated)==facts(settled)
     assert len(repeated['settlementReceipts'])==3
     ok('batch_ack_survives_restart')
-    ui.click('任务');ui.click('进行中');ui.click('完成任务：ExpiredPromise0',scroll=True)
+    ui.click('任务');ui.click('进行中',scroll=True);ui.click('完成任务：ExpiredPromise0',scroll=True)
     late,_=export_file('late');assert net(late)==-50 and len(late['repaymentAllocations'])==1
     alloc=late['repaymentAllocations'][0]
     own_contract=next(c for c in late['contracts'] if c['questId']=='ExpiredPromise0')
     own_cost=next(c for c in late['consequences'] if c['contractId']==own_contract['id'])
     assert alloc['consequenceId']==own_cost['id'] and alloc['xp']==25
     ok('late_completion_repays_own_debt')
-    ui.click('任务');ui.click('已完成');ui.click('ExpiredPromise0');ui.click('撤销本次完成',scroll=True)
+    ui.click('任务');ui.click('已完成',scroll=True);ui.click('ExpiredPromise0',scroll=True);ui.click('撤销本次完成',scroll=True)
     ui.nodes(ui.is_label('确认完成'));ui.click('关闭')
     undone,_=export_file('undone');assert net(undone)==-75
     assert len(undone['repaymentAllocations'])==2 and undone['repaymentAllocations'][1]['reversalOf'] is not None

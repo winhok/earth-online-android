@@ -140,25 +140,26 @@ def hide_keyboard() -> None:
 
 
 def scroll_to(value: str) -> ET.Element:
-    for _ in range(9):
-        # First let the new window appear; an IME may arrive after the initial tap.
-        dump()
-        hide_keyboard()
-        root = dump()
-        found = [n for n in root.iter('node') if is_label(value)(n)]
-        if found:
-            return found[-1]
-        w, h = map(int, re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1])
-        scrolling = [n for n in root.iter('node') if n.get('scrollable') == 'true' and n.get('package') == PACKAGE]
-        assert scrolling, f'No scrollable app content while searching for {value}'
-        container = max(scrolling, key=lambda n: (bounds(n)[2]-bounds(n)[0])*(bounds(n)[3]-bounds(n)[1]))
-        x1, y1, x2, y2 = bounds(container)
-        # Stay inside the content margin and above any delayed keyboard, not on its keys.
-        x = min(w-12, x2-12)
-        start_y = min(y2-24, int(h*.50))
-        end_y = max(y1+24, int(h*.23))
-        assert start_y > end_y + 50, (container.attrib, value)
-        adb('shell', 'input', 'swipe', str(x), str(start_y), str(x), str(end_y), '350')
+    for forward in (True, False):
+        for _ in range(12):
+            # First let the new window appear; an IME may arrive after the initial tap.
+            dump()
+            hide_keyboard()
+            root = dump()
+            found = [n for n in root.iter('node') if is_label(value)(n)]
+            if found:
+                return found[-1]
+            w, h = map(int, re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1])
+            scrolling = [n for n in root.iter('node') if n.get('scrollable') == 'true' and n.get('package') == PACKAGE]
+            assert scrolling, f'No scrollable app content while searching for {value}'
+            container = max(scrolling, key=lambda n: (bounds(n)[2]-bounds(n)[0])*(bounds(n)[3]-bounds(n)[1]))
+            x1, y1, x2, y2 = bounds(container)
+            x = min(w-12, x2-12)
+            upper = max(y1+24, int(h*.23))
+            lower = min(y2-24, int(h*.72))
+            assert lower > upper + 50, (container.attrib, value)
+            start_y, end_y = (lower, upper) if forward else (upper, lower)
+            adb('shell', 'input', 'swipe', str(x), str(start_y), str(x), str(end_y), '350')
     raise AssertionError(f'Could not scroll to {value}')
 
 
@@ -192,7 +193,7 @@ def create_task(title: str) -> None:
     hide_keyboard(); click('保存')
     wait_absent(is_label('任务标题'))
     nodes(is_label('任务日志'))
-    click('进行中'); scroll_to(title)
+    click('进行中', scroll=True); scroll_to(title)
 
 
 def main() -> None:
@@ -208,11 +209,11 @@ def main() -> None:
     hide_keyboard(); click('创建本地角色', scroll=True)
     nodes(is_label('指挥台')); ok('offline_onboarding'); screenshot('01-dashboard')
     click('任务'); create_task('ReleaseSmokeTask'); ok('create_task')
-    click('完成任务：ReleaseSmokeTask'); click('已完成')
+    click('完成任务：ReleaseSmokeTask'); click('已完成', scroll=True)
     nodes(is_label('ReleaseSmokeTask')); click('ReleaseSmokeTask')
     nodes(is_label('撤销本次完成')); ok('completion_is_persisted')
     click('撤销本次完成'); nodes(is_label('确认完成'))
-    click('关闭'); click('进行中'); nodes(is_label('ReleaseSmokeTask'))
+    click('关闭'); click('进行中', scroll=True); nodes(is_label('ReleaseSmokeTask'))
     ok('undo_restores_active_task'); screenshot('02-quests')
     adb('shell', 'am', 'force-stop', PACKAGE)
     adb('shell', 'am', 'start', '-W', '-n', PACKAGE + '/.MainActivity')
