@@ -187,7 +187,7 @@ def enter_text(field: ET.Element, text: str) -> None:
 
 
 def create_task(title: str) -> None:
-    click('接取任务')
+    click('接取任务', scroll=True)
     nodes(is_label('接取新任务'))
     enter_text(field_for_label('任务标题'), title)
     hide_keyboard(); click('保存')
