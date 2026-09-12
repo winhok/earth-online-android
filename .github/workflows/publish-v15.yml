@@ -92,13 +92,13 @@ jobs:
           ! grep -q 'application-debuggable' release-output/apk-manifest-summary.txt
           cp release-output/signed-application-source-commit.txt release-output/source-commit.txt
           (cd release-output && sha256sum earth-online-1.5.0.apk earth-online-1.5.0.aab mapping.txt > SHA256SUMS.txt)
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: v15-signed-packages
           path: release-output/
           retention-days: 30
           if-no-files-found: error
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: v15-release-build-evidence
@@ -160,7 +160,7 @@ jobs:
           script: |
             bash scripts/emulator-acceptance.sh
             python3 scripts/release-v15-smoke.py release-output/earth-online-1.5.0.apk old-release/earth-online-1.0.0.apk
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: v15-release-api-${{ matrix.api }}
@@ -217,7 +217,7 @@ jobs:
           cp docs/RELEASE_1.5.0.md release-ready/RELEASE_NOTES.md
           tar -czf release-ready/device-acceptance-evidence.tar.gz device-evidence build-evidence
           (cd release-ready && sha256sum * > SHA256SUMS.txt)
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: v15-release-ready
           path: release-ready/
