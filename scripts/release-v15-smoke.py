@@ -245,7 +245,10 @@ def main():
     assert not [c for c in waived['completions'] if c['revokedAt'] is None]
     ok('force_majeure_preserves_assessment_no_reward')
     ui.click('查看债务及来源');ui.click('选择恢复任务',scroll=True)
-    ui.click('ExpiredPromise1',scroll=True);ui.click('ExpiredPromise2',scroll=True)
+    for title in ('ExpiredPromise1','ExpiredPromise2'):
+        choice=ui.is_checkable_label(title)
+        ui.tap(ui.scroll_to(title,predicate=choice))
+        ui.nodes(lambda n:choice(n) and n.get('checked')=='true')
     ui.nodes(lambda n:any(t.startswith('已选 2 项') for t in ui.labels(n)))
     ui.click('确认选中任务',scroll=True)
     ui.wait_absent(ui.is_label('确认选中任务'))

@@ -139,7 +139,14 @@ def hide_keyboard() -> None:
         print('RELEASE_WARN keyboard_visibility_signal_stale', flush=True)
 
 
-def scroll_to(value: str) -> ET.Element:
+def is_checkable_label(value: str):
+    return lambda n: n.get('checkable') == 'true' and n.get('clickable') == 'true' and any(
+        is_label(value)(child) for child in n.iter('node')
+    )
+
+
+def scroll_to(value: str, predicate=None) -> ET.Element:
+    matches = predicate if predicate is not None else is_label(value)
     for forward in (True, False):
         for _ in range(12):
             # First let the new window appear; an IME may arrive after the initial tap.
@@ -147,7 +154,7 @@ def scroll_to(value: str) -> ET.Element:
             hide_keyboard()
             root = dump()
             w, h = map(int, re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1])
-            found = [n for n in root.iter('node') if is_label(value)(n) and
+            found = [n for n in root.iter('node') if matches(n) and
                      n.get('bounds') != '[0,0][0,0]' and
                      0 <= bounds(n)[1] < bounds(n)[3] <= h - 100]
             if found:
