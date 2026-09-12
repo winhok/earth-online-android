@@ -89,7 +89,7 @@ def export_file(stage):
     ui.adb('shell','rm','-f','/sdcard/Download/earth-online-*.json')
     before=exported()
     settings();ui.click('导出存档',scroll=True)
-    save=ui.nodes(lambda n:n.get('text','').upper()=='SAVE' or n.get('text')=='保存')[-1]
+    save=ui.nodes(ui.is_document_save_button)[-1]
     ui.tap(save)
     ui.nodes(lambda n:any(t.startswith('存档已导出') for t in ui.labels(n)))
     deadline=time.monotonic()+10

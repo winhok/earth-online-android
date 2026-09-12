@@ -145,6 +145,13 @@ def is_checkable_label(value: str):
     )
 
 
+def is_document_save_button(n: ET.Element) -> bool:
+    return (n.get('package', '').endswith('.documentsui') and
+            n.get('class') == 'android.widget.Button' and
+            n.get('clickable') == 'true' and n.get('enabled') == 'true' and
+            (n.get('text', '').upper() == 'SAVE' or n.get('text') == '保存'))
+
+
 def scroll_to(value: str, predicate=None) -> ET.Element:
     matches = predicate if predicate is not None else is_label(value)
     for forward in (True, False):

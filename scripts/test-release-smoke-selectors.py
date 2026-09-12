@@ -35,5 +35,27 @@ class RecoveryChoiceSelectorTest(unittest.TestCase):
             self.assertFalse(ui.is_checkable_label('ExpiredPromise2')(row))
 
 
+class DocumentSaveSelectorTest(unittest.TestCase):
+    def test_actual_documents_ui_button_matches_in_both_languages(self):
+        for text in ('SAVE', '保存'):
+            button = ET.Element('node', {
+                'text': text, 'package': 'com.android.documentsui',
+                'class': 'android.widget.Button', 'clickable': 'true', 'enabled': 'true',
+            })
+            self.assertTrue(ui.is_document_save_button(button))
+
+    def test_stale_app_save_label_and_disabled_button_do_not_match(self):
+        stale = ET.Element('node', {
+            'text': '保存', 'package': 'xyz.winhok.earthonline',
+            'class': 'android.widget.TextView', 'clickable': 'false', 'enabled': 'true',
+        })
+        self.assertFalse(ui.is_document_save_button(stale))
+        stale.set('package', 'com.android.documentsui')
+        stale.set('class', 'android.widget.Button')
+        stale.set('clickable', 'true')
+        stale.set('enabled', 'false')
+        self.assertFalse(ui.is_document_save_button(stale))
+
+
 if __name__ == '__main__':
     unittest.main()
