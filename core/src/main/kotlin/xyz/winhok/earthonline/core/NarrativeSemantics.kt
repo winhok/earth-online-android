@@ -42,6 +42,8 @@ enum class ScreenSemantic(override val wireId: String) : SemanticKey {
     WORK_DONE_BODY("screen.work-done-body"),
     QUESTS_TITLE("screen.quests-title"),
     QUESTS_BODY("screen.quests-body"),
+    QUEST_TRACK_TITLE("screen.quest-track-title"),
+    QUEST_TRACK_BODY("screen.quest-track-body"),
     FILTER_GOALS("screen.filter-goals"),
     ALL_GOALS("screen.all-goals"),
     NO_GOALS_TITLE("screen.no-goals-title"),
@@ -326,6 +328,7 @@ object NarrativeSemantics {
         addAll(NotificationSemantic.entries)
         addAll(AchievementSemantic.entries)
         addAll(EventSemantic.entries)
+        addAll(ContractSemantic.entries)
     }
 }
 

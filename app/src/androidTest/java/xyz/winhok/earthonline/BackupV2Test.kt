@@ -20,7 +20,7 @@ class BackupV2Test {
         val encoded = BackupCodec.encode(snapshot, now = 2_000)
         val decoded = BackupCodec.decodeSnapshot(encoded)
 
-        assertEquals(2, BackupCodec.VERSION)
+        assertEquals(3, BackupCodec.VERSION)
         assertEquals(snapshot, decoded)
         assertEquals("任务 中文 😀 \\ \"", decoded.world.quests.single().title)
         assertEquals(listOf("contract-1"), decoded.contracts.map { it.id })
@@ -136,6 +136,48 @@ class BackupV2Test {
         assertEquals(20_001L, decoded.world.quests.single().dueDay)
         assertEquals(EarthDatabase.EARTH_NATIVE_NARRATIVE_ID, decoded.narrativePreference.narrativeId)
         assertEquals(emptyList<ContractEntity>(), decoded.contracts)
+    }
+
+    @Test
+    fun v2BackupWithAttenuatedCompletionRewardRemainsImportable() {
+        val source = completeSnapshot().let { snapshot ->
+            snapshot.copy(
+                world = snapshot.world.copy(
+                    completions = snapshot.world.completions.map { it.copy(xp = 20) },
+                    events = snapshot.world.events.map { it.copy(xp = 20) },
+                ),
+                contracts = snapshot.contracts.map {
+                    it.copy(status = "FULFILLED", closedAt = 1_000)
+                },
+                consequences = emptyList(),
+                consequenceAdjustments = emptyList(),
+                repaymentAllocations = emptyList(),
+                recoveryRoutes = emptyList(),
+                recoveryNodes = emptyList(),
+            )
+        }
+        val encoded = JSONObject(BackupCodec.encode(source, now = 2_000))
+        val payload = JSONObject(encoded.getString("payload"))
+        payload.getJSONArray("contracts").getJSONObject(0).apply {
+            remove("signedKind")
+            remove("signedSkill")
+            remove("extensionCount")
+            remove("fulfilledAt")
+            remove("activeQuestId")
+            remove("titleSnapshot")
+        }
+        payload.remove("settlementReceipts")
+        payload.remove("progressHistory")
+        payload.remove("effects")
+        payload.remove("presentationPreferences")
+        val raw = payload.toString()
+        encoded.put("version", 2).put("payload", raw).put("sha256", sha256(raw))
+
+        val decoded = BackupCodec.decodeSnapshot(encoded.toString())
+
+        assertEquals(20, decoded.world.completions.single().xp)
+        assertEquals(20L, decoded.contracts.single().currentRewardXp)
+        assertEquals(1, decoded.contracts.single().extensionCount)
     }
 
     @Test

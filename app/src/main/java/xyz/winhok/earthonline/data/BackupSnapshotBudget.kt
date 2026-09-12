@@ -37,6 +37,9 @@ object BackupSnapshotBudget {
         snapshot.recoveryNodes.forEach {
             bytes += 512 + text(it.routeId, it.questId)
         }
+        bytes += snapshot.settlementReceipts.sumOf { 256 + text(it.consequenceId) }
+        bytes += snapshot.contracts.sumOf { text(it.titleSnapshot) }
+        bytes += snapshot.presentationPreferences.sumOf { 512 + text(it.narrativeId,it.preferenceKey) }
         return bytes
     }
 

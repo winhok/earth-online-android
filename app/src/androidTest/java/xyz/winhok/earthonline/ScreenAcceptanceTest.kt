@@ -86,11 +86,15 @@ class ScreenAcceptanceTest {
             useUnmergedTree = true,
         ).assertExists()
         compose.onNodeWithTag("narrative-cultivation").performScrollTo().performClick()
-        compose.waitUntil(15_000) {
-            runBlocking { repo.snapshotBackup().narrativePreference.narrativeId } == "cultivation"
+        compose.waitUntil(30_000) {
+            runBlocking { repo.snapshotBackup().narrativePreference.narrativeId } == "cultivation" &&
+                compose.onAllNodes(
+                    hasContentDescription("关闭编辑") and isEnabled(),
+                ).fetchSemanticsNodes().isNotEmpty()
         }
+        assertEquals("cultivation", runBlocking { repo.snapshotBackup().narrativePreference.narrativeId })
         val notificationManager = compose.activity.getSystemService(NotificationManager::class.java)
-        compose.waitUntil(15_000) {
+        compose.waitUntil(30_000) {
             notificationManager.getNotificationChannel(Reminders.CHANNEL)?.name?.toString() ==
                 "每日修行提醒"
         }
@@ -105,7 +109,7 @@ class ScreenAcceptanceTest {
         }
         assertEquals(ThemeMode.LIGHT, runBlocking { repo.snapshot().player.theme })
         listOf(
-            "历练" to "历练玉简",
+            "历练" to "修行轨迹",
             "境界" to "修行境界",
             "修行志" to "每次行动与选择都留下可追溯的道痕。",
             "洞天" to "下一项宗门任务",
@@ -138,7 +142,14 @@ class ScreenAcceptanceTest {
         compose.waitUntil(15_000) {
             compose.onAllNodesWithText("历练").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText(lastTitle).assertIsDisplayed()
+        compose.waitUntil(15_000) {
+            runCatching {
+                compose.onNodeWithText(lastTitle).assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
+        compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-search-toggle"))
+        compose.onNodeWithTag("quest-search-toggle").performClick()
         compose.onNodeWithTag("quests-list").performScrollToNode(
             hasTestTag("quest-filter-state.active"),
         )

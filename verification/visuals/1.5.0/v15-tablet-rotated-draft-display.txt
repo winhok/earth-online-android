@@ -1,0 +1,5 @@
+Physical size: 1080x1920
+Override size: 1200x1920
+Physical density: 420
+Override density: 240
+font=1.0

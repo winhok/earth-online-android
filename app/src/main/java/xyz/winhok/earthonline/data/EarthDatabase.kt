@@ -51,6 +51,19 @@ class Converters {
 
 @Dao
 interface EarthDao {
+    @Query("SELECT * FROM settlement_receipts ORDER BY consequenceId") suspend fun settlementReceipts(): List<SettlementReceiptEntity>
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun putSettlementReceipt(value: SettlementReceiptEntity)
+    @Query("DELETE FROM settlement_receipts") suspend fun clearSettlementReceipts()
+    @Query("SELECT * FROM progress_history WHERE id = 1") suspend fun progressHistory(): ProgressHistoryEntity?
+    @Query("SELECT * FROM effect_preferences WHERE id = 1") suspend fun effects(): EffectPreferencesEntity?
+    @Query("SELECT * FROM presentation_preferences ORDER BY narrativeId, preferenceKey") suspend fun presentationPreferences(): List<PresentationPreferenceEntity>
+    @Upsert suspend fun putProgressHistory(value: ProgressHistoryEntity)
+    @Upsert suspend fun putEffects(value: EffectPreferencesEntity)
+    @Upsert suspend fun putPresentationPreference(value: PresentationPreferenceEntity)
+    @Query("DELETE FROM progress_history") suspend fun clearProgressHistory()
+    @Query("DELETE FROM effect_preferences") suspend fun clearEffects()
+    @Query("DELETE FROM presentation_preferences") suspend fun clearPresentationPreferences()
+
     @Query("SELECT * FROM player WHERE id = 1") suspend fun player(): PlayerEntity?
     @Query("SELECT * FROM goals ORDER BY createdAt DESC, id") suspend fun goals(): List<GoalEntity>
     @Query("SELECT * FROM quests ORDER BY createdAt DESC, id") suspend fun quests(): List<QuestEntity>
@@ -60,7 +73,7 @@ interface EarthDao {
     @Query("SELECT * FROM goals WHERE id = :id") suspend fun goal(id: String): GoalEntity?
     @Query("SELECT * FROM completions WHERE id = :id") suspend fun completion(id: String): CompletionEntity?
     @Query("SELECT * FROM narrative_preferences WHERE playerId = 1") suspend fun narrativePreference(): NarrativePreferenceEntity?
-    @Query("SELECT * FROM contracts ORDER BY signedAt, id") suspend fun contracts(): List<ContractEntity>
+    @Query("SELECT * FROM contracts ORDER BY signedAt, rowid") suspend fun contracts(): List<ContractEntity>
     @Query("SELECT * FROM contract_revisions ORDER BY createdAt, id") suspend fun contractRevisions(): List<ContractRevisionEntity>
     @Query("SELECT * FROM consequence_events ORDER BY createdAt, id") suspend fun consequences(): List<ConsequenceEventEntity>
     @Query("SELECT * FROM consequence_adjustments ORDER BY createdAt, id") suspend fun consequenceAdjustments(): List<ConsequenceAdjustmentEntity>
@@ -119,8 +132,10 @@ interface EarthDao {
         ClockBoundaryEntity::class,
         RecoveryRouteEntity::class,
         RecoveryNodeEntity::class,
+        ProgressHistoryEntity::class, EffectPreferencesEntity::class, PresentationPreferenceEntity::class,
+        SettlementReceiptEntity::class,
     ],
-    version = 2, exportSchema = true,
+    version = 3, exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class EarthDatabase : RoomDatabase() {
@@ -128,10 +143,11 @@ abstract class EarthDatabase : RoomDatabase() {
     companion object {
         const val EARTH_NATIVE_NARRATIVE_ID = "earth-native"
         val MIGRATION_1_2 = DatabaseMigrations.V1_TO_V2
+        val MIGRATION_2_3 = DeadlineMigration.V2_TO_V3
 
         fun open(context: Context): EarthDatabase = Room.databaseBuilder(
             context.applicationContext, EarthDatabase::class.java, "earth-online.db"
-        ).addMigrations(MIGRATION_1_2)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build() // Deliberately no fallbackToDestructiveMigration.
     }
 }

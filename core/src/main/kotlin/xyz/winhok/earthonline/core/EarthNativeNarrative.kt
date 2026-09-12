@@ -7,25 +7,7 @@ import java.time.format.DateTimeFormatter
 internal object EarthNativeNarrative {
     val catalogEntries: Set<SemanticKey> get() = catalog().keys
 
-    val unavailable = setOf<SemanticKey>(
-        ActionSemantic.RESCHEDULE_CONTRACT,
-        ActionSemantic.ABANDON_CONTRACT,
-        ActionSemantic.RECOMMIT_CONTRACT,
-        ActionSemantic.SETTLE_OVERDUE,
-        ActionSemantic.VIEW_DEBT,
-        ActionSemantic.OPEN_RECOVERY,
-        ActionSemantic.SELECT_RECOVERY_NODE,
-        ActionSemantic.APPLY_FORCE_MAJEURE,
-        StateSemantic.CONTRACT_ACTIVE,
-        StateSemantic.CONTRACT_FULFILLED,
-        StateSemantic.CONTRACT_OVERDUE,
-        StateSemantic.CONTRACT_ABANDONED,
-        StateSemantic.CONTRACT_EXEMPTED,
-        StateSemantic.DEBT,
-        StateSemantic.OUT_OF_ORDER,
-        StateSemantic.RECOVERY_OPEN,
-        StateSemantic.RECOVERY_CLOSED,
-    )
+    val unavailable = emptySet<SemanticKey>()
 
     fun definition() = NarrativeSystemDefinition(
         manifest = NarrativeManifest(
@@ -67,7 +49,7 @@ internal object EarthNativeNarrative {
             ScreenSemantic.JOIN_TAGLINE to textEntry("现实没有重开键，\n但随时可以接取下一项任务。"),
             ScreenSemantic.JOIN_PRIVACY_NOTICE to textEntry(
                 "无需账号 · 无广告 · 无云端上传\n任务保存在本机。卸载前请导出存档；备份文件为明文。\n" +
-                    "这里不因拖延扣血，也不评价你的现实价值。",
+                    "未签契约不追罚；签约代价先明示。不评价你的现实价值。",
             ),
             ScreenSemantic.DEFAULT_SERVER_NAME to textEntry("现实服"),
             ScreenSemantic.LOAD_ERROR_TITLE to textEntry("无法读取存档"),
@@ -91,7 +73,7 @@ internal object EarthNativeNarrative {
             ActionSemantic.VIEW_ALL to textEntry("全部"),
             ActionSemantic.VIEW_GOAL_QUESTS to textEntry("所属任务"),
             ActionSemantic.EDIT_QUEST to textEntry("编辑任务"),
-            ActionSemantic.POSTPONE_QUEST to textEntry("暂缓一天（不修改截止日）"),
+            ActionSemantic.POSTPONE_QUEST to textEntry("暂缓 / 延期一天（先查看规则）"),
             ActionSemantic.PAUSE_QUEST to textEntry("暂停这项任务"),
             ActionSemantic.RESUME_QUEST to textEntry("重新接取 / 清除暂缓"),
             ActionSemantic.ARCHIVE_QUEST to NarrativeSemanticEntry(
@@ -203,6 +185,8 @@ internal object EarthNativeNarrative {
             ScreenSemantic.WORK_DONE_BODY to textEntry("没有需要现在执行的任务。休息也是正常的冒险节奏。"),
             ScreenSemantic.QUESTS_TITLE to textEntry("任务日志"),
             ScreenSemantic.QUESTS_BODY to textEntry("主线指引方向，支线负责行动。"),
+            ScreenSemantic.QUEST_TRACK_TITLE to textEntry("任务进度"),
+            ScreenSemantic.QUEST_TRACK_BODY to textEntry("完成、待办与逾期责任都来自同一份真实记录。"),
             FieldSemantic.QUEST_SEARCH to textEntry("搜索任务或主线"),
             StateSemantic.LOADING to textEntry("正在读取存档"),
             StateSemantic.LOAD_ERROR to textEntry("存档读取失败", IconRole.ERROR),
@@ -353,7 +337,7 @@ internal object EarthNativeNarrative {
                     NarrativePresentation("${progress.intoLevel} / ${progress.needed} XP")
                 } },
             ),
-            ScreenSemantic.TOTAL_XP to textEntry("累计经验"),
+            ScreenSemantic.TOTAL_XP to textEntry("当前有效经验"),
             ScreenSemantic.COMPLETION_COUNT to textEntry("完成次数"),
             ScreenSemantic.CURRENT_STREAK to NarrativeSemanticEntry(
                 parameters = setOf(SemanticParameters.COUNT),
@@ -428,7 +412,7 @@ internal object EarthNativeNarrative {
                 parameters = setOf(SemanticParameters.ZONE_ID),
                 render = { arguments -> NarrativePresentation(
                     "存档结算时区：${arguments.require(SemanticParameters.ZONE_ID).value}\n" +
-                        "日常按此时区的自然日刷新，旅行或修改设备时区不会切换结算时区。1.0 不提供时区迁移。",
+                        "日常按此时区的自然日刷新，旅行或修改设备时区不会切换结算时区。本版不提供时区迁移。",
                 ) },
             ),
             ScreenSemantic.BACKUP_TITLE to textEntry("本地存档"),
@@ -446,9 +430,9 @@ internal object EarthNativeNarrative {
             ScreenSemantic.ABOUT_BODY to textEntry(
                 "离线单人版 · Kotlin + Jetpack Compose\n不接入广告、分析 SDK、账号或 AI 云服务。",
             ),
-            ScreenSemantic.PRIVACY_TITLE to textEntry("隐私说明 · 离线 1.0"),
+            ScreenSemantic.PRIVACY_TITLE to textEntry("隐私说明 · 离线单人版"),
             ScreenSemantic.PRIVACY_BODY to textEntry(
-                "本应用在应用沙盒的 Room 数据库中保存玩家设置、任务、主线、完成记录及手记。\n\n" +
+                "本应用在应用沙盒的 Room 数据库中保存玩家设置、任务、主线、完成记录、手记、契约、代价、偿债分配、不可抗力原因类别以及展示偏好。\n\n" +
                     "应用没有联网、定位、广告、埋点和远程 AI 功能。系统通知仅在你主动开启后使用；通知不显示任务标题。\n\n" +
                     "存档依靠设备本身的存储保护，数据库未另加应用层加密。系统自动备份已在清单中禁用；厂商行为仍需真机验证。\n\n" +
                     "导出会把明文数据写入你选择的位置，所选文件提供商可能是云盘。导入仅在本机解析。分享和保管导出文件由你控制。\n\n" +
@@ -456,7 +440,7 @@ internal object EarthNativeNarrative {
             ),
             ScreenSemantic.DELETE_DATA_TITLE to textEntry("删除本机全部存档"),
             ScreenSemantic.DELETE_DATA_BODY to textEntry(
-                "任务、主线、经验和日志都会删除。无法在应用内撤回。请先导出存档，再输入“删除”确认。",
+                "任务、主线、经验、契约、债务、日志及偏好都会删除。无法在应用内撤回。请先导出存档，再输入“删除”确认。",
             ),
             ScreenSemantic.DELETE_CONFIRM_FIELD to textEntry("输入：删除"),
             ScreenSemantic.RESTORE_TITLE to textEntry("覆盖本机存档？"),
@@ -495,8 +479,8 @@ internal object EarthNativeNarrative {
             ErrorSemantic.INVALID_BACKUP to textEntry("存档校验失败，原有数据没有被修改。"),
             NotificationSemantic.REMINDER_CHANNEL to textEntry("每日冒险提醒"),
             NotificationSemantic.REMINDER_TITLE to textEntry("冒险仍在继续"),
-            NotificationSemantic.COMPLETION_UNDONE to textEntry("已撤销，经验也已恢复至完成前。"),
-            NotificationSemantic.QUEST_POSTPONED to textEntry("已暂缓一天。原截止日期保留，不扣经验。"),
+            NotificationSemantic.COMPLETION_UNDONE to textEntry("已撤销本次奖励及对应偿债分配。当前经验与债务已按账本重新核对。"),
+            NotificationSemantic.QUEST_POSTPONED to textEntry("暂缓已保存。当前截止日期、可获奖励和代价以任务详情中的契约记录为准。"),
             NotificationSemantic.REMINDER_AVAILABLE to NarrativeSemanticEntry(
                 parameters = setOf(SemanticParameters.COUNT),
                 render = { arguments -> NarrativePresentation(
@@ -572,7 +556,7 @@ internal object EarthNativeNarrative {
                     text = arguments.require(SemanticParameters.NOTE).value,
                 ) },
             ),
-        ),
+        ) + DeadlineNarrative.entries(false),
     )
 
     private fun contentEntry() = NarrativeSemanticEntry(

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.util.UUID
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import kotlinx.coroutines.*
@@ -13,7 +14,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import xyz.winhok.earthonline.EarthApplication
 import xyz.winhok.earthonline.core.*
-import xyz.winhok.earthonline.data.BackupCodec
+import xyz.winhok.earthonline.data.*
 import xyz.winhok.earthonline.reminder.Reminders
 
 data class EarthUiState(
@@ -21,12 +22,31 @@ data class EarthUiState(
     val loading: Boolean = true, val loadError: Boolean = false, val busy: Boolean = false,
     val requestedNarrativeId: String = NarrativeSystemId.EARTH_NATIVE.wireId,
     val narrativeSystemId: NarrativeSystemId = NarrativeSystemId.EARTH_NATIVE,
-) { val day: Long get() = world.dayAt(now) }
+    val book: DeadlineBook = DeadlineBook(),
+    val effects: EffectPreferencesEntity = EffectPreferencesEntity(),
+    val presentationPreferences: List<PresentationPreferenceEntity> = emptyList(),
+    val acknowledgedAssessments: Set<String> = emptySet(),
+) {
+    val day: Long get() = world.dayAt(book.effectiveNow(now))
+    val progress: EffectiveProgress get() = book.progress(world)
+    val deadline: DeadlineState get() = DeadlineState(world, book)
+    val unacknowledged: List<Liability> get() = book.liabilities.filter {
+        it.kind == "OVERDUE" && it.id !in acknowledgedAssessments
+    }
+    fun preference(key: String): Boolean = presentationPreferences.firstOrNull {
+        it.narrativeId == narrativeSystemId.wireId && it.preferenceKey == key
+    }?.enabled ?: false
+    fun reward(quest: Quest): Int = QuestRules.activeCompletion(quest, world.completions, day)?.xp
+        ?: (if (quest.kind == QuestKind.DAILY) null else book.latest(quest.id))?.currentRewardXp?.toInt() ?: QuestRules.reward(quest)
+}
+enum class SettlementFeedback { COMPLETE, ACHIEVEMENT, LEVEL_UP, LEVEL_DOWN, REPAID, RECOVERED, UNDONE }
 data class UiMessage(
     val request: SemanticRequest,
     val undoId: String? = null,
+    val feedback: SettlementFeedback? = null,
+    val closeEditor: Boolean = false,
 )
-private data class LoadedWorld(val world: World = World(), val failed: Boolean = false)
+private data class LoadedWorld(val snapshot: BackupSnapshot = BackupSnapshot(World()), val failed: Boolean = false)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EarthViewModel(private val app: EarthApplication) : ViewModel() {
@@ -38,28 +58,37 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
     val messages = channel.receiveAsFlow()
     private val restoreDraft = MutableStateFlow<PendingRestore?>(null)
     val pendingRestore = restoreDraft.asStateFlow()
+    private val planned = MutableStateFlow<PlannedCommand?>(null)
+    val pendingCommand = planned.asStateFlow()
+    private var pendingSuccess: (() -> Unit)? = null
     private val world = retry.flatMapLatest {
-        repo.observe().map { LoadedWorld(it) }.catch { error ->
+        // One Room transaction supplies facts AND presentation preferences. Never combine
+        // independent flows into an impossible old-ledger/new-system frame.
+        repo.observeSnapshot().map { LoadedWorld(it) }.catch { error ->
             if (error is CancellationException) throw error
             emit(LoadedWorld(failed = true))
         }
     }
-    private val requestedNarrativeId = retry.flatMapLatest {
-        repo.observeNarrativeSystemId()
-    }.catch { error ->
-        if (error is CancellationException) throw error
-        emit(NarrativeSystemId.EARTH_NATIVE.wireId)
+    private val ticker = flow {
+        while (true) {
+            // Foreground midnight reconciliation; correctness also lives in every command.
+            try { repo.reconcile() } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { retry.value++ }
+            emit(System.currentTimeMillis())
+            delay(15_000)
+        }
     }
-    private val ticker = flow { while (true) { emit(System.currentTimeMillis()); delay(15_000) } }
-    val state = combine(world, requestedNarrativeId, ticker, working) { loaded, requestedId, now, busy ->
+    val state = combine(world, ticker, working) { loaded, now, busy ->
+        val snapshot = loaded.snapshot
+        val requested = snapshot.narrativePreference.narrativeId
         EarthUiState(
-            world = loaded.world,
-            now = now,
-            loading = false,
-            loadError = loaded.failed,
-            busy = busy,
-            requestedNarrativeId = requestedId,
-            narrativeSystemId = narrativeRegistry.resolveSystemId(requestedId),
+            world = snapshot.world, now = now, loading = false,
+            loadError = loaded.failed, busy = busy,
+            requestedNarrativeId = requested,
+            narrativeSystemId = narrativeRegistry.resolveSystemId(requested),
+            book = snapshot.deadlineState().book, effects = snapshot.effects,
+            presentationPreferences = snapshot.presentationPreferences,
+            acknowledgedAssessments = snapshot.settlementReceipts.map { it.consequenceId }.toSet(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EarthUiState())
 
@@ -88,23 +117,79 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
         }
     }
     fun join(name: String, server: String) = change { repo.join(name, server) }
-    fun saveQuest(draft: QuestDraft, success: () -> Unit) = change { repo.saveQuest(draft); success() }
-    fun complete(id: String) = change {
-        val result = repo.complete(id)
-        if (result.changed) channel.send(UiMessage(
-            SemanticRequest(NotificationSemantic.QUEST_COMPLETED, semanticArguments {
-                put(SemanticParameters.XP, XpAmount(result.completion.xp))
-            }),
-            result.completion.id,
-        ))
+    /** Preview is not authorization: execute rechecks the disclosure in the write transaction. */
+    private fun request(command: DeadlineCommand, success: (() -> Unit)? = null) = change {
+        if (planned.value != null) return@change
+        val plan = repo.plan(command)
+        if (plan.disclosure != null) {
+            pendingSuccess = success
+            planned.value = plan
+        } else perform(plan, success)
     }
-    fun undo(id: String) = change { if (repo.undo(id)) channel.send(UiMessage(
-        SemanticRequest(NotificationSemantic.COMPLETION_UNDONE),
-    )) }
-    fun postpone(id: String) = change { repo.postpone(id); channel.send(UiMessage(
-        SemanticRequest(NotificationSemantic.QUEST_POSTPONED),
-    )) }
-    fun setQuestState(id: String, status: QuestState) = change { repo.setQuestState(id, status) }
+    private suspend fun perform(plan: PlannedCommand, success: (() -> Unit)?) {
+        val before = repo.reconciledSnapshot().deadlineState()
+        try {
+            val result = repo.execute(plan.command, plan.disclosure)
+            planned.value = null
+            pendingSuccess = null
+            success?.invoke()
+            if (!result.changed) return
+            val old = before.book.progress(before.world)
+            val after = result.state.book.progress(result.state.world)
+            val feedback = when {
+                old.debtXp > 0 && after.debtXp == 0L -> SettlementFeedback.RECOVERED
+                after.current.level < old.current.level -> SettlementFeedback.LEVEL_DOWN
+                after.current.level > old.current.level -> SettlementFeedback.LEVEL_UP
+                result.repaidXp > 0 -> SettlementFeedback.REPAID
+                plan.command is DeadlineCommand.Undo -> SettlementFeedback.UNDONE
+                (ProgressRules.achievements(result.state.world) - ProgressRules.achievements(before.world)).isNotEmpty() -> SettlementFeedback.ACHIEVEMENT
+                else -> SettlementFeedback.COMPLETE
+            }
+            when (plan.command) {
+                is DeadlineCommand.Complete -> channel.send(UiMessage(
+                    SemanticRequest(ContractSemantic.SETTLEMENT, semanticArguments {
+                        put(ContractParameters.SETTLEMENT, SettlementData(result.rewardXp, result.repaidXp,
+                            after.current.level, old.current.level,
+                            (ProgressRules.achievements(result.state.world) - ProgressRules.achievements(before.world)).size))
+                    }), result.completion?.id, feedback,
+                ))
+                is DeadlineCommand.Undo -> channel.send(UiMessage(SemanticRequest(NotificationSemantic.COMPLETION_UNDONE), feedback = feedback))
+                is DeadlineCommand.Postpone -> channel.send(UiMessage(SemanticRequest(NotificationSemantic.QUEST_POSTPONED)))
+                is DeadlineCommand.Waive -> channel.send(UiMessage(SemanticRequest(ContractSemantic.SUMMARY,
+                    semanticArguments { put(ContractParameters.SUMMARY, after) }), feedback = feedback))
+                is DeadlineCommand.Save -> channel.send(UiMessage(SemanticRequest(ActionSemantic.SAVE), closeEditor = true))
+                else -> Unit
+            }
+        } catch (changed: DisclosureRequired) {
+            // A day boundary or another writer changed the stakes. Show fresh numbers;
+            // never reuse the previously accepted price or silently retry the write.
+            pendingSuccess = success
+            planned.value = PlannedCommand(plan.command, changed.disclosure)
+        }
+    }
+    fun dismissCommand() { if (!working.value) { planned.value = null; pendingSuccess = null } }
+    fun confirmCommand() = change {
+        val plan = planned.value ?: return@change
+        perform(plan, pendingSuccess)
+    }
+    fun saveQuest(draft: QuestDraft, success: () -> Unit) = request(
+        DeadlineCommand.Save(draft, draft.id ?: UUID.randomUUID().toString()), success)
+    fun calibrate(quest: Quest) = request(DeadlineCommand.Save(QuestDraft(quest.id, quest.title,
+        quest.description, quest.kind, quest.difficulty, quest.skill, quest.priority,
+        quest.estimatedMinutes, quest.dueDay, quest.goalId), quest.id, calibrate = true))
+    fun complete(id: String) = request(DeadlineCommand.Complete(id))
+    fun undo(id: String) = request(DeadlineCommand.Undo(id))
+    fun postpone(id: String) = request(DeadlineCommand.Postpone(id))
+    fun setQuestState(id: String, status: QuestState) = request(DeadlineCommand.SetState(id, status))
+    fun waive(id: String, reason: ForceMajeureReason) = request(DeadlineCommand.Waive(id, reason))
+    fun selectRecovery(ids: List<String>, success: () -> Unit) = request(DeadlineCommand.SelectRecovery(ids), success)
+    fun acknowledgeAssessments(ids: Set<String>) = change { repo.acknowledgeAssessments(ids.toList()) }
+    fun saveEffects(sound: Boolean, haptics: Boolean, reducedMotion: Boolean) = change {
+        repo.saveEffects(sound, haptics, reducedMotion)
+    }
+    fun setPresentationPreference(key: String, value: Boolean) = change {
+        repo.setPresentationPreference(state.value.narrativeSystemId.wireId, key, value)
+    }
     fun saveGoal(id: String?, title: String, description: String, success: () -> Unit) = change {
         repo.saveGoal(id, title, description); success()
     }
@@ -127,7 +212,7 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
     }
     fun export(uri: Uri) = change {
         withContext(Dispatchers.IO) {
-            val text = BackupCodec.encode(repo.snapshotBackup(), System.currentTimeMillis())
+            val text = BackupCodec.encode(repo.reconciledSnapshot(), System.currentTimeMillis())
             val output = app.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("No output stream")
             output.use { it.write(text.toByteArray(Charsets.UTF_8)); it.flush() }
         }
@@ -164,7 +249,7 @@ class EarthViewModel(private val app: EarthApplication) : ViewModel() {
         channel.send(UiMessage(SemanticRequest(NotificationSemantic.BACKUP_RESTORED)))
     }
     fun reset(success: () -> Unit) = change {
-        repo.reset(); configureReminder(false); restoreDraft.value = null; success()
+        repo.reset(); configureReminder(false); restoreDraft.value = null; planned.value = null; pendingSuccess = null; success()
     }
     class Factory(private val app: EarthApplication) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

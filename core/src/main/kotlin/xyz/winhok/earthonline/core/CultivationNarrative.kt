@@ -5,6 +5,44 @@ import java.time.format.DateTimeFormatter
 
 internal object CultivationNarrative {
     private val directEntries = mapOf<SemanticKey, NarrativeSemanticEntry>(
+        AchievementSemantic.FIRST_STEP to achievement("初引灵气 · 完成 1 项历练"),
+        AchievementSemantic.TEN_QUESTS to achievement("行功初成 · 完成 10 项历练"),
+        AchievementSemantic.HUNDRED_QUESTS to achievement("百炼成章 · 完成 100 项历练"),
+        AchievementSemantic.THREE_DAYS to achievement("三日凝心 · 连续行动 3 天"),
+        AchievementSemantic.SEVEN_DAYS to achievement("七日行功 · 连续行动 7 天"),
+        AchievementSemantic.BOSS_CLEAR to achievement("初度天关 · 完成一项渡劫"),
+        AchievementSemantic.ALL_ROUNDER to achievement("五脉俱修 · 真实行动涉及五项技能"),
+        ScreenSemantic.PROFILE_IDENTITY to NarrativeSemanticEntry(setOf(SemanticParameters.SERVER_NAME, SemanticParameters.LEVEL)) { a ->
+            val level = a.require(SemanticParameters.LEVEL).value
+            NarrativePresentation("${a.require(SemanticParameters.SERVER_NAME).value} · ${RealmTitles.at(level)} · Lv.$level")
+        },
+        ScreenSemantic.PROFILE_PROGRESS to NarrativeSemanticEntry(setOf(SemanticParameters.PROGRESS)) { a ->
+            val p=a.require(SemanticParameters.PROGRESS);NarrativePresentation("${p.intoLevel} / ${p.needed} 修为")
+        },
+        ScreenSemantic.QUEST_GOAL to NarrativeSemanticEntry(setOf(SemanticParameters.TITLE)) { a ->
+            NarrativePresentation("仙途：${a.require(SemanticParameters.TITLE).value}")
+        },
+        ScreenSemantic.JOURNAL_XP to NarrativeSemanticEntry(setOf(SemanticParameters.SIGNED_XP)) { a ->
+            val xp=a.require(SemanticParameters.SIGNED_XP).value;NarrativePresentation("${if(xp>0) "+" else ""}$xp 修为")
+        },
+        ScreenSemantic.EVENT_HEADER to NarrativeSemanticEntry(setOf(SemanticParameters.EVENT_HEADER)) { a ->
+            val e=a.require(SemanticParameters.EVENT_HEADER)
+            NarrativePresentation(eventLabel(e.kind)+" · "+java.time.Instant.ofEpochMilli(e.moment.epochMillis)
+                .atZone(java.time.ZoneId.of(e.moment.zoneId)).format(DateTimeFormatter.ofPattern("MM-dd HH:mm")))
+        },
+        ScreenSemantic.ACHIEVEMENTS_BODY to textEntry("道果由相同的真实完成条件解锁；切换叙事不重领、不增发修为。撤销完成后按有效记录重新计算。"),
+        ScreenSemantic.GOAL_CREATE_TITLE to textEntry("开辟仙途"),
+        ScreenSemantic.GOAL_EDIT_TITLE to textEntry("编辑仙途"),
+        ScreenSemantic.NOTE_EDITOR_TITLE to textEntry("修行手记"),
+        ScreenSemantic.QUEST_CREATE_TITLE to textEntry("接取新历练"),
+        ScreenSemantic.QUEST_EDIT_TITLE to textEntry("编辑历练"),
+        FieldSemantic.GOAL_TITLE to textEntry("仙途名称"),
+        FieldSemantic.GOAL to textEntry("所属仙途"),
+        ActionSemantic.EDIT_QUEST to textEntry("编辑历练"),
+        ActionSemantic.EDIT_GOAL to textEntry("编辑仙途"),
+        ActionSemantic.ARCHIVE_GOAL to textEntry("归档仙途"),
+        NotificationSemantic.QUEST_POSTPONED to textEntry("暂缓已保存。当前天命日期、可获修为和代价以历练详情中的契约记录为准。"),
+        NotificationSemantic.COMPLETION_UNDONE to textEntry("已撤回本次修为及偿债分配。当前修为与劫债已按因果账簿重新核对。"),
         DestinationSemantic.DASHBOARD to textEntry("洞天", IconRole.COMMAND),
         DestinationSemantic.QUESTS to textEntry("历练", IconRole.QUEST),
         DestinationSemantic.PROFILE to textEntry("境界", IconRole.CHARACTER),
@@ -28,7 +66,7 @@ internal object CultivationNarrative {
                 )
             },
         ),
-        ActionSemantic.POSTPONE_QUEST to textEntry("暂缓一日（不改天命）"),
+        ActionSemantic.POSTPONE_QUEST to textEntry("暂缓 / 改命一日（先看规则）"),
         ActionSemantic.PAUSE_QUEST to textEntry("暂歇此项历练"),
         ActionSemantic.RESUME_QUEST to textEntry("重新接取 / 清除暂缓"),
         ScreenSemantic.DASHBOARD_DAY_MODE to NarrativeSemanticEntry(
@@ -40,7 +78,7 @@ internal object CultivationNarrative {
         ScreenSemantic.DASHBOARD_LEVEL to NarrativeSemanticEntry(
             parameters = setOf(SemanticParameters.LEVEL),
             render = { arguments -> NarrativePresentation(
-                "Lv.${arguments.require(SemanticParameters.LEVEL).value} · 修行者",
+                "${RealmTitles.at(arguments.require(SemanticParameters.LEVEL).value)} · Lv.${arguments.require(SemanticParameters.LEVEL).value}",
             ) },
         ),
         ScreenSemantic.DASHBOARD_PROGRESS to NarrativeSemanticEntry(
@@ -58,6 +96,8 @@ internal object CultivationNarrative {
         ScreenSemantic.RECOMMENDATION_NOTICE to textEntry("本地规则推演，不是 AI 占卜。"),
         ScreenSemantic.QUESTS_TITLE to textEntry("历练玉简"),
         ScreenSemantic.QUESTS_BODY to textEntry("仙途指引方向，历练落于现实行动。"),
+        ScreenSemantic.QUEST_TRACK_TITLE to textEntry("修行轨迹"),
+        ScreenSemantic.QUEST_TRACK_BODY to textEntry("行于日常，完成、待行与劫痕都有真实来路。"),
         ScreenSemantic.QUEST_KIND_SIDE to textEntry("支线历练"),
         ScreenSemantic.QUEST_KIND_DAILY to textEntry("日课"),
         ScreenSemantic.QUEST_KIND_BOSS to textEntry("渡劫"),
@@ -84,7 +124,7 @@ internal object CultivationNarrative {
         ScreenSemantic.GOAL_EMPTY_BODY to textEntry("以真实方向为仙途，再拆成今日能做的历练。"),
         ScreenSemantic.CHARACTER_TITLE to textEntry("修行境界"),
         ScreenSemantic.CHARACTER_BODY to textEntry("境界来自真实行动，不来自清单长度。"),
-        ScreenSemantic.TOTAL_XP to textEntry("累计修为"),
+        ScreenSemantic.TOTAL_XP to textEntry("当前有效修为"),
         ScreenSemantic.COMPLETION_COUNT to textEntry("历练达成"),
         ScreenSemantic.STREAK_BODY to textEntry("连续行功 · 休息不会折损修为"),
         ScreenSemantic.SKILLS_TITLE to textEntry("五脉根基"),
@@ -134,7 +174,7 @@ internal object CultivationNarrative {
                 "还有 ${arguments.require(SemanticParameters.COUNT).value} 项可行历练。择一件小事，继续前进。",
             ) },
         ),
-    )
+    ) + DeadlineNarrative.entries(true)
 
     private val inheritedEntries = EarthNativeNarrative.catalogEntries - directEntries.keys
 
@@ -200,6 +240,20 @@ internal object CultivationNarrative {
 
     private fun date(day: Long): String =
         LocalDate.ofEpochDay(day).format(DateTimeFormatter.ISO_LOCAL_DATE)
+
+    private fun achievement(text: String) = NarrativeSemanticEntry(emptySet()) {
+        NarrativePresentation(text, IconRole.REWARD, ColorRole.REWARD, EffectRole.ACHIEVEMENT)
+    }
+    private fun eventLabel(kind: EventKind): String = when(kind) {
+        EventKind.JOINED -> "初入仙途"
+        EventKind.CREATED -> "接取历练"; EventKind.EDITED -> "修订行动说明"
+        EventKind.COMPLETED -> "历练达成"; EventKind.UNDONE -> "撤回达成"
+        EventKind.POSTPONED -> "暂缓历练"; EventKind.PAUSED -> "暂歇历练"
+        EventKind.RESUMED -> "重接历练"; EventKind.ARCHIVED -> "历练归档"
+        EventKind.GOAL_CREATED -> "开辟仙途"; EventKind.GOAL_EDITED -> "修订仙途"
+        EventKind.GOAL_ARCHIVED -> "仙途归档"; EventKind.NOTE -> "修行手记"
+        EventKind.RESTORED -> "恢复存档"
+    }
 
     private fun textEntry(text: String, iconRole: IconRole = IconRole.NEUTRAL) =
         NarrativeSemanticEntry(

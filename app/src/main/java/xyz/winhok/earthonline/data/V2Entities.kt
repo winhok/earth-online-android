@@ -1,6 +1,10 @@
 package xyz.winhok.earthonline.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
+import xyz.winhok.earthonline.core.QuestKind
+import xyz.winhok.earthonline.core.Skill
+import xyz.winhok.earthonline.core.ContractMath
 import androidx.room.ForeignKey
 import androidx.room.Index
 import xyz.winhok.earthonline.core.ClockBoundaryRecord
@@ -42,7 +46,8 @@ data class NarrativePreferenceEntity(
         ),
     ],
     indices = [
-        Index(value = ["questId", "occurrence"], unique = true),
+        Index(value = ["questId", "occurrence"]),
+        Index(value = ["activeQuestId"], unique = true),
         Index("dueDay"),
     ],
 )
@@ -57,6 +62,12 @@ data class ContractEntity(
     override val status: String,
     override val signedAt: Long,
     override val closedAt: Long? = null,
+    @ColumnInfo(defaultValue = "'SIDE'") val signedKind: QuestKind = QuestKind.SIDE,
+    @ColumnInfo(defaultValue = "'DISCIPLINE'") val signedSkill: Skill = Skill.DISCIPLINE,
+    @ColumnInfo(defaultValue = "0") val extensionCount: Int = ContractMath.inferExtensions(originalRewardXp, currentRewardXp),
+    val fulfilledAt: Long? = if (status == "FULFILLED") closedAt else null,
+    val activeQuestId: String? = if (status == "ACTIVE") questId else null,
+    @ColumnInfo(defaultValue = "''") val titleSnapshot: String = "",
 ) : ContractRecord
 
 @Entity(
@@ -100,7 +111,7 @@ data class ContractRevisionEntity(
         ),
     ],
     indices = [
-        Index("contractId"),
+        Index(value = ["contractId"], unique = true),
         Index(value = ["idempotencyKey"], unique = true),
     ],
 )
@@ -158,7 +169,8 @@ data class ConsequenceAdjustmentEntity(
         ),
     ],
     indices = [
-        Index(value = ["completionId", "consequenceId"], unique = true),
+        Index(value = ["completionId", "consequenceId"]),
+        Index(value = ["reversalOf"], unique = true),
         Index("consequenceId"),
         Index(value = ["idempotencyKey"], unique = true),
     ],
@@ -170,6 +182,7 @@ data class RepaymentAllocationEntity(
     override val xp: Long,
     override val createdAt: Long,
     override val idempotencyKey: String,
+    override val reversalOf: String? = null,
 ) : RepaymentAllocationRecord
 
 @Entity(tableName = "clock_boundaries", primaryKeys = ["id"])
@@ -193,6 +206,7 @@ data class RecoveryRouteEntity(
     override val openedAt: Long,
     override val closedAt: Long?,
     override val idempotencyKey: String,
+    @ColumnInfo(defaultValue = "0") val closedThroughAssessmentCount: Int = 0,
 ) : RecoveryRouteRecord
 
 @Entity(

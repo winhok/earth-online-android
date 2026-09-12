@@ -29,6 +29,18 @@ colors:
   night-muted: "#BDCCC0"
   night-outline: "#87978B"
   night-outline-soft: "#3C4D41"
+  cultivation-action: "#146B4D"
+  cultivation-jade: "#B8EBD2"
+  cultivation-gold: "#755A1D"
+  cultivation-gold-soft: "#F2D99B"
+  cultivation-breach: "#9B3B34"
+  cultivation-ground: "#EAF4EC"
+  cultivation-night-action: "#63E6AF"
+  cultivation-night-jade: "#123E31"
+  cultivation-night-gold: "#E2BE70"
+  cultivation-night-gold-deep: "#493A1D"
+  cultivation-night-breach: "#E96A61"
+  cultivation-night-ground: "#071A16"
 typography:
   display:
     fontFamily: "Roboto, sans-serif"
@@ -91,6 +103,11 @@ components:
     textColor: "{colors.reward-gold-ink}"
     rounded: "{rounded.medium}"
     padding: "22dp"
+  card-cultivation-contract:
+    backgroundColor: "{colors.cultivation-night-jade}"
+    textColor: "{colors.night-ink}"
+    rounded: "{rounded.small}"
+    padding: "20dp"
   field-outlined:
     backgroundColor: "{colors.earth-paper}"
     textColor: "{colors.earth-ink}"
@@ -122,7 +139,7 @@ components:
 
 底层事实只有一份，地球原生、修仙、武侠等体系是可以随时切换的叙事解释器。它们可以改变名称、图标、配色、触觉与结算演出，却不能改变任务、奖励、代价或历史。这份“爽感”来自确定、强烈、可追溯的行动反馈；这份重量来自公开、有限、可修复的失约代价，而不是随机惩罚或羞辱。
 
-当前实现是地球原生体系的视觉基线：翡翠绿承载行动，稀缺金色标记奖励和关键突破，深空底色提示“唯一服务器”。Material 3 的原生结构确保任何叙事体系都不会牺牲手机效率和可访问性。
+当前实现同时包含地球原生基线与修仙“宗门战令”世界。地球原生以翡翠行动色、稀缺奖励金和清晰圆角容器表达现实探索；修仙以黑漆玉简、矿物浅玉、金箔契印、朱砂劫痕和星轨切角表达同一份事实。Material 3 的原生结构确保任何叙事体系都不会牺牲手机效率和可访问性。
 
 **Key Characteristics:**
 
@@ -131,6 +148,7 @@ components:
 - 翡翠绿负责“现在就行动”，奖励金只在结算与突破时爆发。
 - 圆润的 Material 3 容器保留亲和力，标题、数字和结算信息负责力量感。
 - 世界观服务于行动；叙事可以切换，底层事实和交互位置保持稳定。
+- 修仙任务页以境界/劫债战况、唯一 Next Quest 玉简和真实任务轨迹形成完整战令，而不是换词后的普通列表。
 
 ## Colors
 
@@ -150,6 +168,14 @@ components:
 ### Tertiary
 
 - **星轨蓝**：仅存在于夜间扩展色阶，为未来确有必要的第三层信息提供冷色分隔；不得与主行动竞争。
+
+### Cultivation
+
+- **宗门翡翠**（日间 `#146B4D`／夜间 `#63E6AF`）：仅用于可执行动作、有效成长与完成节点。
+- **矿物浅玉**（`#EAF4EC`、`#B8EBD2`）：承载日间任务表面，不退化为泛黄羊皮纸。
+- **黑漆玉简**（`#071A16`、`#123E31`）：承载夜间战况、契约主卡与任务轨迹。
+- **契印金箔**（日间 `#755A1D`／夜间 `#E2BE70`）：只用于境界、奖励、签约与当前目的地。
+- **朱砂劫痕**（日间 `#9B3B34`／夜间 `#E96A61`）：只用于债务、逾期与需要恢复的明确状态，并始终配合文字或形状。
 
 ### Neutral
 
@@ -190,11 +216,15 @@ components:
 
 ## Layout
 
-应用采用单列任务流与清晰分区。手机使用底部四目的地导航，大于等于 720dp 的宽屏切换为侧边 Navigation Rail；主内容最大宽度为 880dp，全屏编辑器最大宽度为 760dp。内容区通常使用 20dp 水平边距，首屏与重点空状态可使用 24dp；列表底部保留 104dp，避免 FAB 遮挡最后一项。
+应用默认采用单列任务流与清晰分区；修仙战令在大于等于 720dp 时把境界战况与主契约组成 42/58 双栏，轨迹仍保持单一纵向时间线。手机使用底部四目的地导航，宽屏切换为侧边 Navigation Rail；主内容最大宽度为 1200dp，全屏编辑器最大宽度为 760dp。内容区通常使用 20dp 水平边距，首屏与重点空状态可使用 24dp；列表底部保留 104dp，避免系统导航遮挡最后一项。
+
+修仙任务首屏固定为“体系切换 → 境界/劫债战况 → 唯一 Next Quest 玉简 → 修行轨迹”。搜索与筛选按需展开，不先于当前行动争夺首屏；任务页不再叠加创建 FAB，接取入口与轨迹标题同层，避免遮挡契约内容。宽屏保留相同阅读顺序并使用 Navigation Rail；200% 字体时底栏仅显示当前目的地文字，其余目的地仍保留图标和完整无障碍语义。
 
 空间节奏以 4dp 为基线：8dp 组织紧密元数据，12dp 组织卡片内部层级，16dp 用于任务卡内边距，20dp 用于页面节奏，24dp 用于英雄卡与空状态。筛选器在窄屏中横向滚动，不压缩成不可读的小目标。所有编辑器使用 IME Insets，系统返回与预测返回保持原生语义。
 
 **The One Next Move Rule.** 每个页面优先暴露一个最值得立即执行的动作；手机以单个 FAB 或单个主按钮承载，不堆叠多个同等级召唤。
+
+**The Contract Rail Rule.** 修仙任务页必须让唯一主契约先于轨迹出现；轨迹只能呈现真实任务、完成和逾期事实，不能生成装饰节点或第二份进度。
 
 ## Elevation & Depth
 
@@ -206,7 +236,7 @@ components:
 
 ## Shapes
 
-整体采用柔韧、可触的圆角语言：小型控件 12dp，统计块 16dp，卡片与普通容器 20dp，大型容器 28dp。Planet Mark 的圆形星球与椭圆轨道是核心识别轮廓；其他组件不复制星球造型，以免形成主题乐园式噪声。
+地球原生采用柔韧、可触的圆角语言：小型控件 12dp，统计块 16dp，卡片与普通容器 20dp，大型容器 28dp。修仙体系将 Material 容器收紧为 6/12/18dp，并只在境界战况与主契约玉简使用方向明确的切角；切角表达玉简层级，不编码危险。Planet Mark 的圆形星球与椭圆轨道仍是跨体系核心识别轮廓；其他组件不复制星球造型。
 
 描边卡片用于任务、日志与可进入的详情，填充卡片用于欢迎、推荐与奖励。形状不编码危险程度；错误和删除依赖 Material error 语义色与明确文案。
 
@@ -253,6 +283,10 @@ Planet Mark 是跨叙事体系不变的母品牌锚点。体系可以改变它�
 
 任务卡尾部的 Filled Tonal Icon Button 是最短通关路径：勾选图标必须拥有包含任务标题的无障碍名称，忙碌或当前轮次不可完成时禁用。完成后的 Snackbar 提供明确反馈与“撤销”，形成即时但可回退的结算闭环。
 
+### Cultivation Battle Pass
+
+修仙任务页顶部的体系 Filter Chip 保持 48dp 触控高度，选中态可见且可聚焦。境界战况使用切角描边 Surface，先显示境界、修为进度，再以一行真实账本摘要显示当前有效修为与劫债。唯一 Next Quest 使用黑漆/浅玉高层 Surface、稀缺金色奖励和 56dp 勾选式完成按钮；详情与未逾期延期为次级动作。下方修行轨迹只复用真实 Quest Card，翠色节点表示完成；朱砂节点、明确逾期文字与恢复入口共同表示失约，逾期状态不再提供普通延期。
+
 ## Do's and Don'ts
 
 ### Do:
@@ -263,6 +297,7 @@ Planet Mark 是跨叙事体系不变的母品牌锚点。体系可以改变它�
 - **Do** 同时维护日间与夜间方案，并在大字体、窄屏、宽屏和键盘弹出时保持下一步动作可见。
 - **Do** 让体系切换即时重绘同一份历史，稳定保留任务、XP、代价、完成身份和审计事实。
 - **Do** 在失约前公开代价，在失约后同时展示损失与恢复路径，让惩罚有重量但不成为死局。
+- **Do** 让任务首屏的体系、境界、债务、日期契约、奖励和完成动作都来自当前 Room 快照与叙事目录。
 
 ### Don't:
 

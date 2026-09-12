@@ -7,9 +7,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import android.animation.ValueAnimator
+import android.view.HapticFeedbackConstants
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -28,6 +44,8 @@ import androidx.core.view.WindowCompat
 import xyz.winhok.earthonline.core.*
 
 // Full-screen editors are separate windows; expose feedback in the active window.
+val LocalEarthState = staticCompositionLocalOf { EarthUiState() }
+val LocalQuestPostpone = staticCompositionLocalOf<(String) -> Unit> { {} }
 val LocalEditorSnackbar = staticCompositionLocalOf<SnackbarHostState?> { null }
 
 @Composable
@@ -75,46 +93,118 @@ fun EmptyState(title: String, body: String, actionText: String? = null, action: 
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun QuestCard(quest: Quest, day: Long, done: Boolean, busy: Boolean,
-              onOpen: () -> Unit, onComplete: () -> Unit) {
+              onOpen: () -> Unit, onComplete: () -> Unit, onOverdue: (() -> Unit)? = null) {
     val presenter = LocalNarrativePresenter.current
-    OutlinedCard(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(quest.title, style = MaterialTheme.typography.titleMedium,
-                        maxLines = 3, overflow = TextOverflow.Ellipsis)
-                    Text(presenter.questMeta(quest, day), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (!done && quest.state == QuestState.ACTIVE) {
-                    FilledTonalIconButton(onClick = onComplete, enabled = !busy && QuestRules.available(quest, day)) {
-                        Icon(Icons.Default.Check, contentDescription = presenter.text(
-                            ActionSemantic.COMPLETE_QUEST,
-                            semanticArguments { put(
-                                SemanticParameters.COMPLETE_QUEST_LABEL,
-                                CompleteQuestLabel(CompleteQuestLabelStyle.ACCESSIBILITY, OpaqueText(quest.title)),
-                            ) },
-                        ))
+    val state = LocalEarthState.current
+    val postpone = LocalQuestPostpone.current
+    val cultivation = LocalNarrativeSystemId.current == NarrativeSystemId.CULTIVATION
+    val actionable = !done && !busy && QuestRules.available(quest, day)
+    val overdue = !done && state.book.latest(quest.id)?.status == "OVERDUE"
+    val currentComplete by rememberUpdatedState(onComplete)
+    val currentOpen by rememberUpdatedState(onOpen)
+    var actionsOpen by rememberSaveable(quest.id) { mutableStateOf(false) }
+    val completeLabel = presenter.text(ActionSemantic.COMPLETE_QUEST, semanticArguments {
+        put(SemanticParameters.COMPLETE_QUEST_LABEL,
+            CompleteQuestLabel(CompleteQuestLabelStyle.ACCESSIBILITY, OpaqueText(quest.title)))
+    })
+    Column(Modifier.fillMaxWidth()) {
+        OutlinedCard(onClick = onOpen,
+            shape = if (cultivation) CutCornerShape(topEnd = 16.dp, bottomStart = 10.dp) else RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, if (cultivation) MaterialTheme.colorScheme.secondary.copy(alpha = .65f) else MaterialTheme.colorScheme.outlineVariant),
+            colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            modifier = Modifier.fillMaxWidth().testTag("quest-card-${quest.id}")
+                .semantics {
+                    customActions = buildList {
+                        if (actionable) add(CustomAccessibilityAction(completeLabel) { currentComplete(); true })
+                        add(CustomAccessibilityAction(presenter.text(ActionSemantic.EDIT_QUEST)) { currentOpen(); true })
                     }
                 }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(if (done) presenter.text(StateSemantic.COMPLETED) else presenter.text(
-                    ScreenSemantic.QUEST_REWARD,
-                    semanticArguments { put(SemanticParameters.XP, XpAmount(QuestRules.reward(quest))) },
-                ), style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary)
-                Text(presenter.text(ScreenSemantic.QUEST_PRIORITY_DIFFICULTY, semanticArguments {
-                    put(SemanticParameters.QUEST_PRIORITY_DIFFICULTY,
-                        QuestPriorityDifficulty(4 - quest.priority, quest.difficulty))
-                }), style = MaterialTheme.typography.labelMedium)
-                if (quest.postponeCount >= 3 && !done) Text(presenter.text(StateSemantic.REVIEW_REQUIRED), style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary)
+                .questSwipeGesture(quest.id, actionable, currentComplete) { actionsOpen = true }) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(quest.title, style = MaterialTheme.typography.titleLarge,
+                            maxLines = 4, overflow = TextOverflow.Ellipsis)
+                        Text(presenter.questMeta(quest, day), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (!done && quest.state == QuestState.ACTIVE) {
+                        FilledTonalIconButton(onClick = onComplete, enabled = actionable, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Default.Check, contentDescription = completeLabel)
+                        }
+                    }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(if (done) presenter.text(StateSemantic.COMPLETED) else presenter.text(ScreenSemantic.QUEST_REWARD,
+                        semanticArguments { put(SemanticParameters.XP, XpAmount(state.reward(quest))) }),
+                        style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(presenter.text(ScreenSemantic.QUEST_PRIORITY_DIFFICULTY, semanticArguments {
+                        put(SemanticParameters.QUEST_PRIORITY_DIFFICULTY, QuestPriorityDifficulty(4 - quest.priority, quest.difficulty))
+                    }), style = MaterialTheme.typography.labelMedium)
+                    if (quest.postponeCount >= 3 && !done) Text(presenter.text(StateSemantic.REVIEW_REQUIRED),
+                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                }
+                if (actionable) Text(presenter.text(ContractSemantic.GESTURE_HINT),
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        if (actionsOpen) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (overdue && onOverdue != null) TextButton(
+                onClick = { actionsOpen = false; onOverdue() },
+                modifier = Modifier.testTag("quest-overdue-recovery"),
+            ) {
+                Text(presenter.text(ActionSemantic.OPEN_RECOVERY))
+            } else if (actionable) TextButton(onClick = { actionsOpen = false; postpone(quest.id) }) {
+                Text(presenter.text(if (state.book.active(quest.id) != null) ContractSemantic.POSTPONE_SIGNED else ActionSemantic.POSTPONE_QUEST))
+            }
+            TextButton(onClick = { actionsOpen = false; onOpen() }) { Text(presenter.text(ActionSemantic.EDIT_QUEST)) }
+            TextButton(onClick = { actionsOpen = false }) { Text(presenter.text(ActionSemantic.CLOSE)) }
+        }
     }
+}
+
+/** One completion gesture contract for ordinary cards and the highlighted next quest. */
+@Composable
+internal fun Modifier.questSwipeGesture(
+    key: Any,
+    completeEnabled: Boolean,
+    onComplete: () -> Unit,
+    onRevealActions: (() -> Unit)? = null,
+): Modifier {
+    val state = LocalEarthState.current
+    val view = LocalView.current
+    val threshold = with(LocalDensity.current) { 88.dp.toPx() }
+    val reduced = state.effects.reducedMotion || !ValueAnimator.areAnimatorsEnabled()
+    val currentComplete by rememberUpdatedState(onComplete)
+    val currentReveal by rememberUpdatedState(onRevealActions)
+    val enabled by rememberUpdatedState(completeEnabled)
+    val haptics by rememberUpdatedState(state.effects.haptics)
+    var drag by remember(key) { mutableFloatStateOf(0f) }
+    var signalled by remember(key) { mutableStateOf(false) }
+    return this
+        .offset { IntOffset(if (reduced) 0 else (drag * .18f).roundToInt(), 0) }
+        .pointerInput(key, threshold) {
+            detectHorizontalDragGestures(
+                onDragStart = { drag = 0f; signalled = false },
+                onDragCancel = { drag = 0f; signalled = false },
+                onDragEnd = {
+                    if (drag >= threshold && enabled) currentComplete()
+                    else if (drag <= -threshold) currentReveal?.invoke()
+                    drag = 0f
+                    signalled = false
+                },
+            ) { change, amount ->
+                change.consume()
+                drag = (drag + amount).coerceIn(-threshold * 1.5f, threshold * 1.5f)
+                if (abs(drag) >= threshold && !signalled) {
+                    signalled = true
+                    if (haptics) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                }
+            }
+        }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -146,7 +236,7 @@ fun EditorFrame(title: String, busy: Boolean, canSave: Boolean, onDismiss: () ->
         }
         Surface(Modifier.fillMaxSize()) {
             Scaffold(
-                snackbarHost = { snackbar?.let { SnackbarHost(it) } },
+                snackbarHost = { snackbar?.let { SettlementSnackbarHost(it) } },
                 topBar = {
                     TopAppBar(title = { Text(title) }, navigationIcon = {
                         IconButton(onClick = { finishEditing(onDismiss) }, enabled = !busy) {

@@ -78,7 +78,7 @@ class UiJourneyTest {
         assertEquals(25L, runBlocking { ProgressRules.total(repo.snapshot().completions).xp })
         compose.onNodeWithText("撤销").performClick()
         compose.waitUntil(15_000) { runBlocking { ProgressRules.total(repo.snapshot().completions).xp == 0L } }
-        compose.onNodeWithText("完成端到端测试").assertExists()
+        await(hasText("完成端到端测试"))
     }
     @Test fun editorDraftSurvivesActivityRecreation() {
         join()

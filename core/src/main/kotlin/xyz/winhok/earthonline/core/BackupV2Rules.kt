@@ -55,6 +55,7 @@ interface ConsequenceAdjustmentRecord {
 }
 
 interface RepaymentAllocationRecord {
+    val reversalOf: String? get() = null
     val id: String
     val consequenceId: String
     val completionId: String
@@ -107,17 +108,18 @@ object DebtRules {
         allocations: List<RepaymentAllocationRecord>,
     ): Long {
         val adjustmentsByConsequence = adjustments.groupBy { it.consequenceId }
-        val allocationsByConsequence = allocations.groupBy { it.consequenceId }
+        val reversed = allocations.mapNotNull { it.reversalOf }.toSet()
+        val allocationsByConsequence = allocations.filter { it.reversalOf == null && it.id !in reversed }.groupBy { it.consequenceId }
         return consequences.fold(0L) { total, consequence ->
             val changes = adjustmentsByConsequence[consequence.id].orEmpty()
-            val waived = safeSum(changes.asSequence().filter { it.kind == "WAIVER" }.map { it.xp })
+            val waived = safeSum(changes.asSequence().filter { it.kind in setOf("WAIVER", "RESTITUTION") }.map { it.xp })
             val refunded = safeSum(changes.asSequence().filter { it.kind == "REFUND" }.map { it.xp })
             val repaid = safeSum(
                 allocationsByConsequence[consequence.id].orEmpty().asSequence().map { it.xp },
             )
             val settled = safeSubtract(safeSubtract(consequence.xp, waived), repaid)
-            requireBackup(settled >= 0 && refunded <= repaid)
             val remaining = safeAdd(settled, refunded)
+            requireBackup(remaining >= 0)
             safeAdd(total, remaining)
         }
     }
@@ -142,9 +144,9 @@ object BackupV2Rules {
     private val contractStatuses = setOf("ACTIVE", "FULFILLED", "OVERDUE", "ABANDONED", "EXEMPTED")
     private val terminalContractStatuses = contractStatuses - "ACTIVE"
     private val originalRewards = setOf(10L, 25L, 35L, 50L, 75L)
-    private val revisionKinds = setOf("SIGNED", "POSTPONED", "RESCHEDULED", "ABANDONED", "RECOMMITTED", "EDITED")
+    private val revisionKinds = setOf("SIGNED", "POSTPONED", "RESCHEDULED", "ABANDONED", "RECOMMITTED", "EDITED") + ForceMajeureReason.entries.map { "EXEMPTED_${it.name}" }
     private val consequenceKinds = setOf("OVERDUE", "ABANDONED")
-    private val adjustmentKinds = setOf("WAIVER", "REFUND")
+    private val adjustmentKinds = setOf("WAIVER", "REFUND", "RESTITUTION")
     private val recoveryStatuses = setOf("OPEN", "CLOSED")
     private val recoveryTriggers = setOf("FULL_BREACH_COUNT", "DEBT_LEVEL")
 
@@ -168,11 +170,11 @@ object BackupV2Rules {
         val consequences = graph.consequences.associateBy { it.id }
         val routes = graph.recoveryRoutes.associateBy { it.id }
 
-        requireBackup(unique(graph.contracts.map { it.questId to it.occurrence }))
+        requireBackup(unique(graph.contracts.filter { it.status == "ACTIVE" }.map { it.questId to it.occurrence }))
         graph.contracts.forEach { contract ->
             val quest = quests[contract.questId]
             requireBackup(
-                validId(contract.id) && quest != null && quest.kind != QuestKind.DAILY &&
+                validId(contract.id) && quest != null && (contract.status != "ACTIVE" || quest.kind != QuestKind.DAILY) &&
                     contract.occurrence == "once" && validZone(contract.zoneId) &&
                     validDay(contract.dueDay) && contract.originalRewardXp in originalRewards &&
                     contract.currentRewardXp in 1..contract.originalRewardXp &&
@@ -221,19 +223,28 @@ object BackupV2Rules {
         }
 
         requireBackup(unique(graph.repaymentAllocations.map { it.idempotencyKey }))
-        requireBackup(unique(graph.repaymentAllocations.map { it.completionId to it.consequenceId }))
+        val allocationIndex = graph.repaymentAllocations.associateBy { it.id }
+        val reversed = graph.repaymentAllocations.mapNotNull { it.reversalOf }
+        requireBackup(reversed.size == reversed.toSet().size)
+        val activeAllocations = graph.repaymentAllocations.filter { it.reversalOf == null && it.id !in reversed }
         graph.repaymentAllocations.forEach { allocation ->
             val completion = completions[allocation.completionId]
             val consequence = consequences[allocation.consequenceId]
             requireBackup(
                 validId(allocation.id) && consequence != null && completion != null &&
-                    completion.revokedAt == null && allocation.xp in 1..consequence.xp &&
+                    (allocation !in activeAllocations || completion.revokedAt == null) && allocation.xp in 1..consequence.xp &&
                     allocation.createdAt >= 0 && validIdempotencyKey(allocation.idempotencyKey),
             )
         }
-        val allocationsByConsequence = graph.repaymentAllocations.groupBy { it.consequenceId }
+        graph.repaymentAllocations.filter { it.reversalOf != null }.forEach { reversal ->
+            val original = allocationIndex[reversal.reversalOf]
+            requireBackup(original != null && original.reversalOf == null && original.id != reversal.id &&
+                original.consequenceId == reversal.consequenceId && original.completionId == reversal.completionId &&
+                original.xp == reversal.xp && reversal.createdAt >= original.createdAt)
+        }
+        val allocationsByConsequence = activeAllocations.groupBy { it.consequenceId }
         val adjustmentsByConsequence = graph.consequenceAdjustments.groupBy { it.consequenceId }
-        graph.repaymentAllocations.groupBy { it.completionId }.forEach { (completionId, allocations) ->
+        activeAllocations.groupBy { it.completionId }.forEach { (completionId, allocations) ->
             val allocated = DebtRules.safeSum(allocations.asSequence().map { it.xp })
             requireBackup(allocated <= requireNotNull(completions[completionId]).xp)
         }
@@ -242,9 +253,10 @@ object BackupV2Rules {
                 allocationsByConsequence[consequence.id].orEmpty().asSequence().map { it.xp },
             )
             val changes = adjustmentsByConsequence[consequence.id].orEmpty()
-            val waived = DebtRules.safeSum(changes.asSequence().filter { it.kind == "WAIVER" }.map { it.xp })
+            val waived = DebtRules.safeSum(changes.asSequence().filter { it.kind in setOf("WAIVER", "RESTITUTION") }.map { it.xp })
             val refunded = DebtRules.safeSum(changes.asSequence().filter { it.kind == "REFUND" }.map { it.xp })
-            requireBackup(DebtRules.safeAdd(allocated, waived) <= consequence.xp && refunded <= allocated)
+            val historicalPaid = DebtRules.safeSum(graph.repaymentAllocations.filter { it.consequenceId == consequence.id && it.reversalOf == null }.asSequence().map { it.xp })
+            requireBackup(waived <= consequence.xp && DebtRules.safeAdd(allocated, waived) <= consequence.xp && refunded <= historicalPaid && refunded <= consequence.xp)
         }
         DebtRules.outstandingXp(graph.consequences, graph.consequenceAdjustments, graph.repaymentAllocations)
 

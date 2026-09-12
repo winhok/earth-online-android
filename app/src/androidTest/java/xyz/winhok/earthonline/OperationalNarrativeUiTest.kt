@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -30,6 +31,7 @@ import xyz.winhok.earthonline.ui.NarrativeHost
 import xyz.winhok.earthonline.ui.NarrativePresenter
 import xyz.winhok.earthonline.ui.PrimaryNavigation
 import xyz.winhok.earthonline.ui.QuestCard
+import xyz.winhok.earthonline.ui.QuestsScreen
 
 @RunWith(AndroidJUnit4::class)
 class OperationalNarrativeUiTest {
@@ -96,6 +98,40 @@ class OperationalNarrativeUiTest {
         assertTrue(ScreenSemantic.QUEST_REWARD in presenter.requests.map { it.key })
         assertTrue(ScreenSemantic.QUEST_PRIORITY_DIFFICULTY in presenter.requests.map { it.key })
         assertTrue(xyz.winhok.earthonline.core.StateSemantic.REVIEW_REQUIRED in presenter.requests.map { it.key })
+    }
+
+    @Test
+    fun earthNativeNonEmptyQuestListKeepsCreateActionReachable() {
+        val presenter = RecordingPresenter()
+        var creates = 0
+        val state = EarthUiState(
+            world = World(
+                player = Player(name = "Tester", zoneId = "UTC", onboarded = true),
+                quests = listOf(Quest(id = "existing", title = "Existing", createdAt = 1, updatedAt = 1)),
+            ),
+            now = 1_757_325_600_000L,
+            loading = false,
+        )
+
+        compose.setContent {
+            EarthTheme(ThemeMode.LIGHT) {
+                NarrativeHost(presenter) {
+                    QuestsScreen(
+                        state = state,
+                        create = { creates += 1 },
+                        open = {},
+                        complete = {},
+                        editGoal = {},
+                        archiveGoal = {},
+                        switchNarrative = {},
+                        openLedger = {},
+                    )
+                }
+            }
+        }
+
+        compose.onNodeWithTag("quest-create").assertIsDisplayed().performClick()
+        assertEquals(1, creates)
     }
 
     @Test

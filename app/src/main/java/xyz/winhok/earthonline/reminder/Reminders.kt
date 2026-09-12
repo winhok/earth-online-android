@@ -42,11 +42,10 @@ object Reminders {
         val manager = requireNotNull(context.getSystemService(NotificationManager::class.java)) {
             "NotificationManager unavailable"
         }
-        manager.createNotificationChannel(NotificationChannel(
-            CHANNEL,
-            narrativeText(systemId, NotificationSemantic.REMINDER_CHANNEL),
-            NotificationManager.IMPORTANCE_DEFAULT,
-        ))
+        val channelName = narrativeText(systemId, NotificationSemantic.REMINDER_CHANNEL)
+        val channel = manager.getNotificationChannel(CHANNEL)?.apply { name = channelName }
+            ?: NotificationChannel(CHANNEL, channelName, NotificationManager.IMPORTANCE_DEFAULT)
+        manager.createNotificationChannel(channel)
         val work = WorkManager.getInstance(context)
         if (!enabled) {
             work.cancelUniqueWork(WORK_NAME)

@@ -4,16 +4,19 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import xyz.winhok.earthonline.core.*
 
 @Composable
-fun CharacterScreen(state: EarthUiState) {
+fun CharacterScreen(state: EarthUiState, model: EarthViewModel? = null, ledger: () -> Unit = {}) {
     val presenter = LocalNarrativePresenter.current
     val world = state.world
-    val progress = ProgressRules.total(world.completions)
+    val progress = state.progress.current
     val done = world.completions.count { it.revokedAt == null }
     val badges = ProgressRules.achievements(world)
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -37,6 +40,8 @@ fun CharacterScreen(state: EarthUiState) {
                 }
             }
         }
+        item { ContractBalance(state, ledger) }
+        if (model != null) item { WorldStory(state, model) }
         item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SmallStat(progress.xp.toString(), presenter.text(ScreenSemantic.TOTAL_XP), Modifier.weight(1f))
             SmallStat(done.toString(), presenter.text(ScreenSemantic.COMPLETION_COUNT), Modifier.weight(1f))
@@ -72,12 +77,15 @@ fun CharacterScreen(state: EarthUiState) {
         ) }
         items(AchievementSemantic.entries) { achievementSemantic ->
             val id = achievementSemantic.sourceId
-            val achievement = presenter.text(achievementSemantic)
+            val achievement = presenter.present(achievementSemantic)
             OutlinedCard(Modifier.fillMaxWidth()) {
-                Text(presenter.text(if (id in badges) StateSemantic.UNLOCKED else StateSemantic.LOCKED) +
-                    "   " + achievement,
-                    modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium,
-                    color = if (id in badges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if(id !in badges) Icons.Default.Lock else if(achievement.iconRole == IconRole.REWARD) Icons.Default.Spa else Icons.Default.EmojiEvents,
+                        null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text(presenter.text(if (id in badges) StateSemantic.UNLOCKED else StateSemantic.LOCKED) + "   " + achievement.text,
+                        modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+                        color = if (id in badges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         item { Spacer(Modifier.height(24.dp)) }
