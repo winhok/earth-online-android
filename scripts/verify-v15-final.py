@@ -40,4 +40,4 @@ summary['application_source_equivalence']=metadata['application_source_equivalen
 summary['native_capture_states_verified']=24
 summary['visual_review']='Actual screenshots retained for completion review; no claim of human physical-device validation.'
 summary_path.write_text(json.dumps(summary,ensure_ascii=False,indent=2))
-print('32 native capture states verified in addition to all exact-APK and instrumentation gates.')
+print('24 native capture states verified in addition to all exact-APK and instrumentation gates.')
