@@ -37,10 +37,12 @@ class RecoveryChoiceSelectorTest(unittest.TestCase):
 
 class DocumentSaveSelectorTest(unittest.TestCase):
     def test_actual_documents_ui_button_matches_in_both_languages(self):
-        for text in ('SAVE', '保存'):
+        for text, widget in (('SAVE', 'android.widget.Button'), ('保存', 'android.widget.Button'),
+                             ('SAVE', 'android.widget.TextView')):
             button = ET.Element('node', {
                 'text': text, 'package': 'com.android.documentsui',
-                'class': 'android.widget.Button', 'clickable': 'true', 'enabled': 'true',
+                'resource-id': 'android:id/button1',
+                'class': widget, 'clickable': 'true', 'enabled': 'true',
             })
             self.assertTrue(ui.is_document_save_button(button))
 
@@ -52,6 +54,7 @@ class DocumentSaveSelectorTest(unittest.TestCase):
         self.assertFalse(ui.is_document_save_button(stale))
         stale.set('package', 'com.android.documentsui')
         stale.set('class', 'android.widget.Button')
+        stale.set('resource-id', 'android:id/button1')
         stale.set('clickable', 'true')
         stale.set('enabled', 'false')
         self.assertFalse(ui.is_document_save_button(stale))

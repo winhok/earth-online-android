@@ -147,7 +147,7 @@ def is_checkable_label(value: str):
 
 def is_document_save_button(n: ET.Element) -> bool:
     return (n.get('package', '').endswith('.documentsui') and
-            n.get('class') == 'android.widget.Button' and
+            n.get('resource-id') == 'android:id/button1' and
             n.get('clickable') == 'true' and n.get('enabled') == 'true' and
             (n.get('text', '').upper() == 'SAVE' or n.get('text') == '保存'))
 
