@@ -146,10 +146,12 @@ def scroll_to(value: str) -> ET.Element:
             dump()
             hide_keyboard()
             root = dump()
-            found = [n for n in root.iter('node') if is_label(value)(n)]
+            w, h = map(int, re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1])
+            found = [n for n in root.iter('node') if is_label(value)(n) and
+                     n.get('bounds') != '[0,0][0,0]' and
+                     0 <= bounds(n)[1] < bounds(n)[3] <= h - 100]
             if found:
                 return found[-1]
-            w, h = map(int, re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1])
             scrolling = [n for n in root.iter('node') if n.get('scrollable') == 'true' and n.get('package') == PACKAGE]
             assert scrolling, f'No scrollable app content while searching for {value}'
             container = max(scrolling, key=lambda n: (bounds(n)[2]-bounds(n)[0])*(bounds(n)[3]-bounds(n)[1]))

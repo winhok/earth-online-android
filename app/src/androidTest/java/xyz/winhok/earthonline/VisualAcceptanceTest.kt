@@ -177,8 +177,19 @@ class VisualAcceptanceTest {
         compose.onNodeWithTag("quests-list").performScrollToNode(hasTestTag("quest-create"))
         compose.onNodeWithTag("quest-create").assertIsDisplayed().performClick()
         compose.onNodeWithTag("quest-title").performTextInput("旋转保留草稿")
+        compose.onNodeWithTag("quest-title").assertTextContains("旋转保留草稿")
+        compose.waitForIdle()
         shell("wm size 1200x1920")
-        compose.waitUntil(25_000) { compose.onAllNodesWithTag("quest-title").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(25_000) {
+            var portrait = false
+            activity?.onActivity { a ->
+                portrait = a.resources.configuration.screenWidthDp < a.resources.configuration.screenHeightDp
+            }
+            portrait && runCatching {
+                compose.onNodeWithTag("quest-title").assertTextContains("旋转保留草稿")
+                true
+            }.getOrDefault(false)
+        }
         compose.onNodeWithTag("quest-title").assertTextContains("旋转保留草稿")
         capture("v15-tablet-rotated-draft")
     }
